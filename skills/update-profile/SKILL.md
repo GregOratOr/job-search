@@ -24,6 +24,17 @@ read-only. If unsure, ask before writing to `profile/`.
 4. Append one line to `profile/CHANGELOG.md`:
    `| YYYY-MM-DD | <file> | <what changed> |`
 
+## Bullet & summary style
+When writing `highlights` or summaries, follow the style guide. Full rules (Harvard
+guidelines, complete action-verb bank, per-section tips) are in
+`docs/resume-writing-reference.md`; condensed recap in the root `AGENTS.md`:
+- **XYZ formula:** "Accomplished [X], as measured by [Y], by doing [Z]." → bullet =
+  **[action verb] + [what] + [tools/how] + [quantified result]**.
+- Active voice, no pronouns, no narrative; action verb first, metric last; past tense
+  for finished work (present only for a current role).
+- Summaries: 3–4 sentences (who you are → what you build → what you want), no bullets.
+- Bold key terms with `\textbf{...}`.
+
 ## Pitfalls
 - Never add data to tailoring files — that's what `replace()` overrides are for.
 - Forgetting the registry entry hides the new var from the AI/tailoring tools.

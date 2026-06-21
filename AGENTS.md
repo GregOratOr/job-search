@@ -127,6 +127,84 @@ cv_data = CV(
 
 ---
 
+## Writing Bullet Points & Summaries — Style Guide
+
+This is the condensed style guide for drafting `highlights` (experience, project, research)
+and `summaries`. It applies in two places:
+1. **Master profile** entries in `profile/*.py` (only on an explicit "update profile" command).
+2. **Per-job rewrites** in `resume/tailoring/{id}.py` via `dataclasses.replace()`.
+
+> 📖 **Full reference:** `docs/resume-writing-reference.md` holds the complete, durable
+> rule set — the entire Harvard MCS guide (resume language, top mistakes, full DO/DON'T
+> lists), the **complete action-verb bank by category**, per-section guidance, cover letter
+> tips, and AI-usage rules. **Read it before any profile or tailoring edit** so nothing is
+> missed during a long session. The section below is only a quick recap.
+
+Other docs (`profile/AGENTS.md`, `resume/AGENTS.md`, the SKILL.md files) point to the same
+reference.
+
+### The XYZ formula (use for every bullet)
+
+Google's formula — **"Accomplished [X], as measured by [Y], by doing [Z]."**
+
+> *Accomplished* a 2.3\\texttimes{} faster inference path (**X**), *as measured by* p99 latency
+> dropping from 180ms to 78ms (**Y**), *by doing* CUDA kernel fusion and FP16 quantization (**Z**).
+
+In a resume bullet this compresses to: **[Action verb] + [what you built/did] + [tools/how] +
+[quantified result]**. Lead with the verb, end with the metric. If you cannot measure Y,
+still name a concrete outcome (shipped, adopted, reduced, enabled) — never stop at the task.
+
+### Harvard MCS guidelines (resume language)
+
+Source: <https://careerservices.fas.harvard.edu/resources/create-a-strong-resume/>
+
+**DO**
+- Be **specific, not general**; **active, not passive**; write to **express, not impress**.
+- Be **fact-based** — quantify and qualify every claim you can.
+- Start each bullet with a strong **action verb**; vary verbs across bullets.
+- Use reverse-chronological order within a section (most recent first).
+- Write for systems/people that **scan quickly** — front-load the impact.
+
+**DON'T**
+- Use personal pronouns ("I", "we") or narrative/full-sentence prose.
+- Start a line with a date, abbreviate, or use slang/flowery language.
+- Describe duties without results — every bullet should *demonstrate an outcome*.
+- Use passive voice ("was responsible for…") — convert to an action verb.
+
+### Action verb bank (Harvard categories)
+
+Pick a verb that matches the work; never reuse the same verb twice in one entry.
+**Full list of all verbs per category lives in `docs/resume-writing-reference.md` §3.**
+
+| Category | Sample verbs |
+|----------|--------------|
+| Leadership   | Led, Directed, Spearheaded, Orchestrated, Oversaw, Coordinated, Improved, Increased |
+| Technical    | Built, Designed, Engineered, Optimized, Programmed, Streamlined, Standardized, Overhauled |
+| Research     | Investigated, Analyzed, Modeled, Derived, Evaluated, Diagnosed, Tested, Identified |
+| Quantitative | Calculated, Computed, Forecasted, Maximized, Minimized, Analyzed, Projected |
+| Communication| Authored, Presented, Documented, Collaborated, Negotiated, Synthesized |
+| Creative     | Created, Designed, Conceived, Initiated, Introduced, Redesigned, Founded |
+
+### Per-section nuances
+
+- **Experience** — past tense (present tense only for a current role). Each bullet = one
+  accomplishment with a metric. 1–3 bullets per entry in a tailored resume.
+- **Projects** — same XYZ shape but emphasize **technical approach → scale/scope → outcome**
+  (e.g. "Implemented X using Y, trained on N samples, achieving Z").
+- **Research** — emphasize the problem, method, and findings; cite frameworks/datasets.
+  Outcomes can be insights or benchmarks rather than business metrics.
+- **Summary** — 3–4 sentences, no bullets: **who you are → what you build → what you want**.
+  In a tailored summary, name the company explicitly. Keep it active and specific.
+
+### Formatting rules (apply everywhere)
+
+- Bold key technical terms with `\\textbf{...}` (skills, tools, frameworks, headline metrics).
+- Keep each bullet under ~200 characters so it stays on 1–2 lines in the PDF.
+- Multiplication factor: `2.3\\texttimes{}`. Percentages: `40\\%`.
+- Escape LaTeX specials in all bullet/summary text: `%→\\%`, `&→\\&`, `$→\\$`, `_→\\_`, `#→\\#`.
+
+---
+
 ## Workflow: Update Your Profile (add experience/projects)
 
 ### "I just finished a new internship at NVIDIA"

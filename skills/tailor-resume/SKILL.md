@@ -26,7 +26,17 @@ Read `profile/` only. NEVER edit any file under `profile/`. Every job-specific c
 6. Fill `applications/jobs/<id>/job_info.py` (KEYWORDS, URL, PLATFORM).
 7. Build: `python scripts/build.py --id <id> --pdf`
 
+## Bullet & summary style
+Full rules in `docs/resume-writing-reference.md` (Harvard guidelines, complete action-verb
+bank, cover letter tips); condensed recap in the root `AGENTS.md`. Reworded bullets must follow it:
+- **XYZ formula:** "Accomplished [X], as measured by [Y], by doing [Z]." → bullet =
+  **[action verb] + [what] + [tools/how] + [quantified result]**.
+- Active voice, no pronouns, no narrative; strong action verb first, metric last.
+- Bold key terms with `\textbf{...}`; keep each bullet under ~200 chars.
+- Tailored summary: 3–4 sentences naming the company explicitly.
+
 ## Pitfalls
 - Only use entry names returned by `--inventory`; never invent variable names.
 - Escape LaTeX specials in bullets: `%`→`\%`, `&`→`\&`, `$`→`\$`, `_`→`\_`, `#`→`\#`.
 - Do not duplicate profile data into tailoring files — only select + `replace()`.
+- Never invent metrics or facts — quantify only what is true.

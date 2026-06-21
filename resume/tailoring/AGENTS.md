@@ -23,6 +23,11 @@ Each `.py` file here is a thin configuration layer over `profile/master_data.py`
 
 ## Using replace() for Bullet Overrides
 
+Reworded bullets follow the style guide (full rules in `docs/resume-writing-reference.md`;
+condensed recap in the root `AGENTS.md`): XYZ formula ("Accomplished [X], as measured by [Y],
+by doing [Z]"), action verb first, metric last, active voice, key terms in `\textbf{...}`,
+under ~200 chars.
+
 ```python
 from dataclasses import replace
 from profile.master_data import AI_INTEGRATOR_DAKDAN  # real names: scripts/update_profile.py --inventory

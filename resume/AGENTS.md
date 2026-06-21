@@ -20,6 +20,15 @@ resume/
 - Use `dataclasses.replace(ENTRY, highlights=[...])` for per-job bullet overrides.
 - `OUTPUT_FILE` in every tailoring file must be `f"resume/outputs/{JOB_ID}.tex"`.
 
+## Writing Override Bullets
+
+Reworded `highlights` must follow the style guide. Full rules (Harvard guidelines, complete
+action-verb bank, per-section tips) are in `docs/resume-writing-reference.md`; the root
+`AGENTS.md` has a condensed recap. In short: XYZ formula ("Accomplished [X], as measured by
+[Y], by doing [Z]"), strong action verb first, quantified result last, active voice, no
+pronouns, under ~200 chars, key terms in `\\textbf{...}`. Rewrite to hit the JD's keywords
+without inventing facts.
+
 ## Build Command
 
 ```bash
