@@ -38,6 +38,9 @@ CoverLetter(
    to the job description. Do not summarize the resume — add context or emphasis.
 3. **Close**: Forward-looking sentence + call to action. Keep it confident but brief.
 
+> 📖 Full cover letter tips (general rules about letters, tone, length, the "marketing tool"
+> mindset) and the shared resume style guide live in `docs/resume-writing-reference.md` §5.
+
 ## Build Command
 
 ```bash

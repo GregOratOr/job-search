@@ -33,6 +33,23 @@ When a tailoring file needs a new bullet variation, use `dataclasses.replace()`.
 
 ---
 
+## How to Write Bullets & Summaries
+
+Follow the style guide for every `highlights` list and summary. The **full rule set** —
+complete Harvard guidelines, the entire action-verb bank, per-section and cover letter tips —
+lives in `docs/resume-writing-reference.md`. The root `AGENTS.md` has a condensed recap.
+**Open the reference before editing entries.**
+
+Quick reference:
+- **XYZ formula:** "Accomplished [X], as measured by [Y], by doing [Z]." → in a bullet:
+  **[Action verb] + [what] + [tools/how] + [quantified result]**.
+- Active voice, no pronouns, no narrative; start with an action verb, end with a metric.
+- Past tense for finished work (present tense only for a current role).
+- Summaries: 3–4 sentences (who you are → what you build → what you want), no bullets.
+- Bold key terms with `\textbf{...}`; escape LaTeX specials (`%→\%`, `&→\&`, `$→\$`, `_→\_`).
+
+---
+
 ## Agent Workflows — How to Update the Profile
 
 ### Add a new work experience entry
