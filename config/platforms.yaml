@@ -1,0 +1,85 @@
+# config/platforms.yaml
+# =====================
+# Step-by-step application workflows for each job platform.
+# Referenced by AGENTS.md and the networking strategy docs.
+# Add new platforms by copying any existing block.
+
+platforms:
+
+  LinkedIn:
+    url: https://linkedin.com/jobs
+    search_filters:
+      experience_level: ["Entry level", "Associate", "Mid-Senior level"]
+      date_posted:      "Past week"       # or "Past 24 hours" for hot roles
+      job_type:         ["Full-time"]
+      easy_apply:       false             # Don't limit to Easy Apply — direct apps are better
+    application_steps:
+      - "Set up Job Alerts for each `target_roles.primary` term in config/job_search_config.yaml"
+      - "Review alert emails daily; open each posting in a new tab"
+      - "Check if you have 1st/2nd degree connections at the company (see networking/ workflow)"
+      - "Run `python scripts/new_application.py --id <id> --company <co> --role <role>`"
+      - "Edit `resume/tailoring/<id>.py` — match bullets to JD keywords in job_info.py"
+      - "Edit `coverletter/tailoring/<id>.py` — personalize paragraph 1 to the company"
+      - "Run `python scripts/build.py --id <id> --pdf` to generate PDFs"
+      - "Apply on LinkedIn with the generated PDF resume + cover letter"
+      - "Run `python scripts/track.py log --id <id> --platform LinkedIn --url <url>`"
+    notes: >
+      LinkedIn Easy Apply often goes to ATS; direct applications via company website
+      (linked from the posting) tend to be seen faster. Use Easy Apply only if company
+      website requires account creation and has no other option.
+
+  Indeed:
+    url: https://indeed.com
+    search_filters:
+      date_posted:  "Last 7 days"
+      job_type:     ["Full-time"]
+      salary:       "$120,000+"
+    application_steps:
+      - "Search using terms from `search_terms.must_include_one_of` in config"
+      - "Skip duplicates already found on LinkedIn (check tracker.csv by URL)"
+      - "For unique postings: follow same scaffold → tailor → build → apply flow as LinkedIn"
+      - "Many Indeed postings redirect to company website — apply there directly"
+      - "Log with `python scripts/track.py log --id <id> --platform Indeed`"
+
+  Handshake:
+    url: https://joinhandshake.com
+    notes: >
+      OSU alumni account. Good for startups and companies that actively recruit from OSU.
+      Filter by 'ML', 'AI', 'Software Engineer' + graduation year range.
+    application_steps:
+      - "Log in with OSU credentials at joinhandshake.com"
+      - "Set filters: Full-time, role keywords, graduation year"
+      - "Reach out to company reps directly in the Handshake chat for referrals"
+
+  company_websites:
+    notes: >
+      Tier 1 and Tier 2 companies from config. Check their careers pages weekly.
+      Direct applications avoid ATS keyword-rejection on aggregators.
+    companies_and_career_urls:
+      - { company: NVIDIA,         url: "https://nvidia.wd5.myworkdayjobs.com/" }
+      - { company: Google,         url: "https://careers.google.com/jobs" }
+      - { company: OpenAI,         url: "https://openai.com/careers" }
+      - { company: Anthropic,      url: "https://anthropic.com/careers" }
+      - { company: Meta AI,        url: "https://metacareers.com/" }
+      - { company: Microsoft,      url: "https://careers.microsoft.com/" }
+      - { company: Apple,          url: "https://jobs.apple.com/" }
+      - { company: Amazon AWS,     url: "https://amazon.jobs/" }
+      - { company: Adobe,          url: "https://adobe.wd5.myworkdayjobs.com/" }
+      - { company: Waymo,          url: "https://waymo.com/joinus/" }
+      - { company: Cohere,         url: "https://cohere.com/careers" }
+      - { company: Hugging Face,   url: "https://huggingface.co/jobs" }
+    application_steps:
+      - "Weekly: visit each URL above and scan for new ML/AI roles"
+      - "New opening found → scaffold + tailor + build + apply (same flow)"
+      - "Log with `python scripts/track.py log --id <id> --platform 'Company Website'`"
+
+  referrals:
+    notes: >
+      Highest success rate. Prioritize getting a referral before applying anywhere.
+    workflow:
+      - "Find job posting → check LinkedIn for connections at that company"
+      - "If 1st-degree: message directly (template in networking/message_templates.md)"
+      - "If 2nd-degree: ask mutual connection for an intro, or cold connect with personalized note"
+      - "If alumni: search OSU/VIT alumni group on LinkedIn, mention shared affiliation"
+      - "After referral confirmed: apply via company website (not LinkedIn Easy Apply)"
+      - "Log with `python scripts/track.py log --id <id> --platform Referral --notes 'Referred by <name>'`"
