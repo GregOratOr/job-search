@@ -62,9 +62,6 @@ signature.jpg
 *.pdf
 Official Transcript*
 
-# ── Private data submodule (local checkout — not part of public template) ─────
-private/
-
 # ── Editor / IDE ──────────────────────────────────────────────────────────────
 .cursor/
 .vscode/
