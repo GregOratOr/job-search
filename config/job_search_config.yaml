@@ -1,0 +1,86 @@
+# config/job_search_config.yaml
+# ==============================
+# Global configuration for the job search campaign.
+# Copy and customize for your own profile (or use private/config/ via submodule).
+
+profile:
+  name: "Jane Doe"
+  current_location: "Example City, ST"
+  willing_to_relocate: true
+  preferred_locations:
+    - "San Francisco Bay Area, CA"
+    - "Seattle, WA"
+    - "Remote"
+  work_authorization: "Authorized to work in the US"
+  availability: "Immediate"
+  target_salary_usd: 150000
+
+target_roles:
+  primary:
+    - "Machine Learning Engineer"
+    - "ML Engineer"
+    - "AI Engineer"
+  secondary:
+    - "Research Engineer"
+    - "Deep Learning Engineer"
+    - "Software Engineer - ML"
+  avoid:
+    - "Data Analyst"
+    - "Business Analyst"
+
+search_terms:
+  must_include_one_of:
+    - "PyTorch"
+    - "CUDA"
+    - "deep learning"
+    - "machine learning"
+    - "LLM"
+  nice_to_have:
+    - "reinforcement learning"
+    - "GPU"
+    - "inference optimization"
+    - "MLOps"
+  exclude:
+    - "10+ years"
+    - "requires security clearance"
+
+active_platforms:
+  - name: LinkedIn
+    enabled: true
+    alert_frequency: "daily"
+  - name: Indeed
+    enabled: true
+    alert_frequency: "daily"
+  - name: company_websites
+    enabled: true
+    alert_frequency: "weekly"
+
+target_companies:
+  tier_1:
+    - NVIDIA
+    - Google DeepMind
+    - OpenAI
+    - Anthropic
+  tier_2:
+    - Apple ML Research
+    - Amazon AWS AI
+    - Databricks
+    - Hugging Face
+  tier_3:
+    - Salesforce AI
+    - LinkedIn
+  startups:
+    - []
+
+weekly_goals:
+  applications_per_week: 10
+  networking_connections_per_week: 5
+  follow_ups_per_week: 3
+
+networking:
+  connection_request_delay_days: 3
+  follow_up_delay_days: 7
+  alumni_networks:
+    - "Example University"
+  communities:
+    - "MLOps Community Slack"

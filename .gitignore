@@ -1,0 +1,75 @@
+# ── Generated outputs (rebuild from tailoring files) ────────────────────────
+resume/outputs/*.tex
+resume/outputs/*.pdf
+resume/outputs/*.aux
+resume/outputs/*.log
+resume/outputs/*.out
+resume/outputs/*.toc
+resume/outputs/*.fls
+resume/outputs/*.fdb_latexmk
+resume/outputs/*.synctex.gz
+coverletter/outputs/*.tex
+coverletter/outputs/*.pdf
+coverletter/outputs/*.aux
+coverletter/outputs/*.log
+coverletter/outputs/*.out
+
+# Keep the output directories themselves
+!resume/outputs/.gitkeep
+!coverletter/outputs/.gitkeep
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+.env
+
+# ── Secrets ──────────────────────────────────────────────────────────────────
+.env
+*.secret
+secrets.yaml
+
+# ── OS & Editor ──────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# ── Signature image (keep local, don't commit personal files) ────────────────
+signature.png
+signature.jpg
+
+# ── Personal documents (never commit) ───────────────────────────────────────
+*.pdf
+Official Transcript*
+
+# ── Private data submodule (local checkout — not part of public template) ─────
+private/
+
+# ── Editor / IDE ──────────────────────────────────────────────────────────────
+.cursor/
+.vscode/
+
+# ── Networking CSV (contains personal contact info — review before sharing) ──
+# Template versions are committed; your real connections live in private/networking/
+networking/connections.csv
+

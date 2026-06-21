@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "job-search"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "jinja2>=3.1.0",
+    "pyyaml>=6.0",
+    "anthropic>=0.40.0",
+    "httpx>=0.27.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["profile*", "resume*", "coverletter*"]
+
+# ── UV (recommended package manager) ─────────────────────────────────────────
+# Setup:        uv sync
+# Run a script: uv run scripts/build.py --id <id>
+# Add package:  uv add <package>
+# Lock file:    uv.lock (committed to repo)
+[tool.uv]
+# No special config needed — uv reads [project.dependencies] automatically
