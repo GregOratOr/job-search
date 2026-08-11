@@ -1,3 +1,4 @@
+<!-- skills/README.md -->
 # skills/
 
 Project-authored agent skill files (`SKILL.md`) that teach Hermes and Cursor how to run
@@ -7,11 +8,14 @@ this project's workflows. They are thin wrappers over `scripts/` — see the tab
 
 ## Optional: add external skills
 
-### Option A — Git Submodule
+### Option A — Git Submodule (into a separate directory)
+
+This is optional and only for personal reuse of external skills. `skills/` itself is
+project-authored — do **not** submodule over it. Use a separate directory:
 
 ```bash
 # From the repo root (first time)
-git submodule add https://github.com/GregOratOr/skills skills
+git submodule add https://github.com/GregOratOr/skills skills-external
 git submodule update --init --recursive
 
 # Keep in sync later
@@ -42,7 +46,7 @@ See [SETUP.md](SETUP.md) for wiring these skills into **Hermes (local Ollama)** 
 **Cursor**.
 
 > Hard rule: `profile/` is READ-ONLY for agents unless the user explicitly commands a
-> profile change. Tailoring writes only to `resume/tailoring/`, `coverletter/tailoring/`,
+> profile change. Tailoring writes only to `resume/outputs/`, `coverletter/outputs/`,
 > and `applications/`. See root `AGENTS.md`.
 
 ## Skills in this folder
@@ -50,15 +54,21 @@ See [SETUP.md](SETUP.md) for wiring these skills into **Hermes (local Ollama)** 
 Each skill is a thin wrapper over a `scripts/` command. The agent reasons; the script
 generates files.
 
-| Skill file                              | What it does                                          |
-|-----------------------------------------|-------------------------------------------------------|
-| `skills/tailor-resume/SKILL.md`         | Tailor resume + cover letter from a JD/URL            |
-| `skills/build-documents/SKILL.md`       | Render `.tex` and compile PDFs                        |
-| `skills/track-application/SKILL.md`     | Log/update applications in tracker.csv                |
-| `skills/new-application/SKILL.md`       | Scaffold a new application bundle                     |
-| `skills/update-profile/SKILL.md`        | Edit `profile/` — ONLY on explicit user command      |
-| `skills/discover-jobs/SKILL.md`         | Find open roles (agent web tools) + tailor each       |
-| `skills/networking-outreach/SKILL.md`   | Draft LinkedIn/email outreach from templates          |
+| Skill file                              | What it does                                                      |
+|-----------------------------------------|-------------------------------------------------------------------|
+| `skills/run-pipeline/SKILL.md`          | Run the scripted batch pipeline (discover→tailor→…→bundle→track)  |
+| `skills/tailor-resume/SKILL.md`         | Tailor a resume from a JD/URL to a built 1-page PDF               |
+| `skills/tailor-coverletter/SKILL.md`    | Tailor a cover letter (hook/evidence/close) to a built 1-page PDF |
+| `skills/build-documents/SKILL.md`       | Render `.tex`, compile PDFs, finalize the bundle                  |
+| `skills/track-application/SKILL.md`     | Log/update applications in tracker.csv                            |
+| `skills/new-application/SKILL.md`       | Orchestrate a single application end to end (intake → bundle)     |
+| `skills/update-profile/SKILL.md`        | Edit `profile/` — ONLY on explicit user command                  |
+| `skills/discover-jobs/SKILL.md`         | Find open roles → shortlist (+ optional handoff to new-application) |
+| `skills/research/SKILL.md`              | Research a company/topic into a sourced brief                     |
+| `skills/find-contacts/SKILL.md`         | Find recruiters/hiring managers (queries + public pages)          |
+| `skills/audit-application/SKILL.md`   | Critique tailored resume/CL before submitting                     |
+| `skills/networking-outreach/SKILL.md`   | Draft LinkedIn/email outreach from templates                      |
+| `skills/follow-up/SKILL.md`             | Surface + draft follow-ups for stale applications                 |
 
 ---
 

@@ -33,7 +33,7 @@ hermes setup
 #    Windows: xcopy /E /I skills %USERPROFILE%\.hermes\skills
 ```
 
-Run Hermes **from the repo root** (`L:\Job Search`) so it auto-loads `AGENTS.md` and the
+Run Hermes **from the repo root** so it auto-loads `AGENTS.md` and the
 subdirectory `AGENTS.md` files, then prompt naturally, e.g.
 "Tailor my resume for this JD: <paste>" or "Find 5 ML Engineer roles and prepare each".
 
@@ -57,6 +57,7 @@ will run the `scripts/` commands and read `skills/{name}/SKILL.md` as needed.
 ---
 
 ## What stays untouched
-`scripts/ai_tailor.py` and `scripts/job_discovery.py` use `scripts/llm_provider.py` and read
+`scripts/ai_tailor.py` and `scripts/pipeline.py` (via the `job_discovery` library) use
+`scripts/llm_provider.py` and read
 `LLM_PROVIDER` from `.env` (`anthropic`, `ollama`, or `openai`-compatible). For agent-driven
 search/tailoring without those scripts, use the `discover-jobs` and `tailor-resume` skills with Hermes.
