@@ -1,20 +1,10 @@
-# ── Generated outputs (rebuild from tailoring files) ────────────────────────
-resume/outputs/*.tex
-resume/outputs/*.pdf
-resume/outputs/*.aux
-resume/outputs/*.log
-resume/outputs/*.out
-resume/outputs/*.toc
-resume/outputs/*.fls
-resume/outputs/*.fdb_latexmk
-resume/outputs/*.synctex.gz
-coverletter/outputs/*.tex
-coverletter/outputs/*.pdf
-coverletter/outputs/*.aux
-coverletter/outputs/*.log
-coverletter/outputs/*.out
+# ── Generated outputs (rebuild from per-job .py sources) ────────────────────
+resume/outputs/*
+!resume/outputs/*.py
+coverletter/outputs/*
+!coverletter/outputs/*.py
 
-# Keep the output directories themselves
+# Keep .py sources and the output directories themselves
 !resume/outputs/.gitkeep
 !coverletter/outputs/.gitkeep
 
@@ -58,9 +48,13 @@ Thumbs.db
 signature.png
 signature.jpg
 
-# ── Personal documents (never commit) ───────────────────────────────────────
-*.pdf
-Official Transcript*
+# ── Personal documents & working notes (never commit) ───────────────────────
+
+
+# Real application bundles stay private — only the template ships publicly.
+applications/jobs/*
+!applications/jobs/_template/
+
 
 # ── Editor / IDE ──────────────────────────────────────────────────────────────
 .cursor/
