@@ -1,10 +1,10 @@
 """
 resume/tailoring/_template.py
 ==============================
-TAILORING INTERFACE — the only file you touch per job application.
+TAILORING INTERFACE — scaffold only. Per-job copies live in resume/outputs/{id}.py.
 
 Copy this file:
-    python scripts/new_application.py --id <id> --company <co> --role <role>
+    uv run scripts/new_application.py --id <id> --company <co> --role <role>
 
 Then edit the 5 numbered sections below. Nothing else needs to change.
 """
@@ -25,6 +25,7 @@ from profile.master_data import (
 JOB_ID      = "_template"
 COMPANY     = "Company Name"
 ROLE        = "Role Title"
+# Scaffold/ai_tailor rewrite this to an overlay-aware path (e.g. private/resume/outputs/{id}.tex).
 OUTPUT_FILE = f"resume/outputs/{JOB_ID}.tex"
 
 CONFIG = SectionConfig(

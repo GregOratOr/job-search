@@ -1,7 +1,8 @@
 """
 coverletter/tailoring/_template.py
 ====================================
-COVER LETTER TAILORING INTERFACE
+COVER LETTER TAILORING INTERFACE — scaffold only.
+Per-job copies live in coverletter/outputs/{id}_cl.py.
 """
 
 import datetime
@@ -15,7 +16,8 @@ DEPT       = "Engineering / Recruiting"
 CITY       = "City, State ZIP"
 POSTING_ID = None
 
-OUTPUT_FILE = f"coverletter/outputs/{JOB_ID}.tex"
+# Scaffold/ai_tailor rewrite this to an overlay-aware path.
+OUTPUT_FILE = f"coverletter/outputs/{JOB_ID}_cl.tex"
 
 PARAGRAPHS = [
     (

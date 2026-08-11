@@ -3,8 +3,12 @@ coverletter/cl2latex.py
 -----------------------
 LaTeX generation engine for cover letters.
 
-Usage:
-    python coverletter/cl2latex.py --data coverletter/tailoring/google_swe_2026.py
+Usage (prefer ``--id`` so paths go through ``scripts.data_paths``):
+    uv run coverletter/cl2latex.py --id google_swe_2026
+    uv run coverletter/cl2latex.py --id google_swe_2026 --private
+    uv run coverletter/cl2latex.py --data coverletter/outputs/google_swe_2026_cl.py
+
+Or: uv run scripts/build.py --id google_swe_2026 --only coverletter
 """
 
 import sys
@@ -193,12 +197,28 @@ def load_data_module(file_path: str):
         sys.exit(1)
 
 
+def generate_for_id(job_id: str, output_file: str = "") -> Path:
+    """Resolve source + ``.tex`` via ``data_paths`` and render."""
+    from scripts.data_paths import rel_to_root, resolve_document_paths
+
+    try:
+        src, tex = resolve_document_paths("coverletter", job_id)
+    except FileNotFoundError as exc:
+        print(f"[x] {exc}")
+        sys.exit(1)
+    if src.parent.name == "tailoring":
+        print(f"[!] Using legacy path {rel_to_root(src)}")
+    out = output_file or str(tex)
+    return generate_tex_file(str(src), out)
+
+
 def generate_tex_file(data_file: str, output_file: str = "") -> Path:
     """Generate a .tex cover letter from a tailoring module.
 
     Args:
         data_file:   Path to a tailoring .py file containing cl_data.
         output_file: Override output path. If empty, uses cl_data.output_file.
+                     Prefer passing an overlay-aware path from ``document_tex``.
 
     Returns:
         Path to the generated .tex file.
@@ -222,15 +242,33 @@ def generate_tex_file(data_file: str, output_file: str = "") -> Path:
         sys.exit(1)
 
     output_file_path.write_text(rendered_latex, encoding="utf-8")
-    print(f"[+] Success! → {output_file_path.resolve()}")
+    print(f"[+] Success! -> {output_file_path.resolve()}")
     return output_file_path
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate a LaTeX cover letter.")
-    parser.add_argument("--data", "-p", default="coverletter/tailoring/_template.py",
-                        help="Path to the tailoring .py file")
+    _root = Path(__file__).resolve().parent.parent
+    if str(_root) not in sys.path:
+        sys.path.insert(0, str(_root))
+    from scripts.data_paths import add_overlay_cli_flags, bootstrap_paths
+
+    parser = argparse.ArgumentParser(
+        description="Generate a LaTeX cover letter. Prefer --id (uses data_paths) over raw --data.",
+    )
+    src = parser.add_mutually_exclusive_group()
+    src.add_argument("--id", "-i", help="Application ID - resolves via data_paths document_*")
+    src.add_argument("--data", "-p",
+                     help="Explicit path to a source .py (or scaffold template)")
     parser.add_argument("--output", "-o", default="",
-                        help="Override output .tex path")
+                        help="Override .tex path (default with --id: document_tex)")
+    add_overlay_cli_flags(parser)
     args = parser.parse_args()
-    generate_tex_file(args.data, args.output)
+    active = bootstrap_paths(args)
+    print(f">>> Path mode: {'private' if active else 'public'}"
+          f"{' (forced)' if args.overlay is not None else ' (auto)'}")
+
+    if args.id:
+        generate_for_id(args.id, args.output)
+    else:
+        data = args.data or "coverletter/tailoring/_template.py"
+        generate_tex_file(data, args.output)

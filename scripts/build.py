@@ -1,19 +1,24 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
 """
 scripts/build.py
 ----------------
 Build the resume and/or cover letter .tex files for a given application ID.
 
-Usage:
-    python scripts/build.py --id google_swe_2026
-    python scripts/build.py --id google_swe_2026 --only resume
-    python scripts/build.py --id google_swe_2026 --only coverletter
-    python scripts/build.py --id google_swe_2026 --pdf   # also run pdflatex
+Per-job sources live under ``{resume,coverletter}/outputs/``
+(``{id}.py`` for resume, ``{id}_cl.py`` for cover letter). Paths are
+routed through ``scripts.data_paths`` (``private/`` when the overlay is active).
 
-After building, compile to PDF:
-    cd resume/outputs && pdflatex google_swe_2026.tex && pdflatex google_swe_2026.tex
-    cd coverletter/outputs && pdflatex google_swe_2026.tex && pdflatex google_swe_2026.tex
-    (run twice so bookmarks and cross-references resolve)
+Path mode (shared with cv2latex / cl2latex / bundle):
+    (default)   auto-detect private/profile/
+    --private   force private/ paths
+    --public    force public repo-root paths
+
+Usage:
+    uv run scripts/build.py --id google_swe_2026
+    uv run scripts/build.py --id google_swe_2026 --private --pdf
+    uv run scripts/build.py --id google_swe_2026 --only resume
+    uv run scripts/build.py --id google_swe_2026 --only coverletter
+    uv run scripts/build.py --id google_swe_2026 --bundle
 """
 
 import argparse
@@ -23,29 +28,45 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from scripts.data_paths import apply_private_overlay, resolve_path
-
-apply_private_overlay()
+from scripts.data_paths import (
+    add_overlay_cli_flags,
+    bootstrap_paths,
+    document_py,
+    document_tex,
+    rel_to_root,
+    resolve_document_paths,
+)
 
 
 def build_resume(job_id: str) -> Path:
-    tailoring_file = resolve_path("resume", "tailoring", f"{job_id}.py")
-    if not tailoring_file.exists():
-        print(f"[x] Resume tailoring file not found: {tailoring_file}")
-        print(f"    Run: python scripts/new_application.py --id {job_id}")
+    try:
+        src, tex_out = resolve_document_paths("resume", job_id)
+    except FileNotFoundError:
+        expected = document_py("resume", job_id)
+        print(f"[x] Resume source file not found: {expected}")
+        print(f"    Run: uv run scripts/new_application.py --id {job_id}")
         sys.exit(1)
+    if src.parent.name == "tailoring":
+        print(f"[!] Using legacy path {rel_to_root(src)}; "
+              f"move to {rel_to_root(document_py('resume', job_id))} when convenient.")
     import resume.cv2latex as engine
-    return engine.generate_tex_file(str(tailoring_file))
+    tex_out.parent.mkdir(parents=True, exist_ok=True)
+    return engine.generate_tex_file(str(src), str(tex_out))
 
 
-def build_coverletter(job_id: str) -> Path:
-    tailoring_file = resolve_path("coverletter", "tailoring", f"{job_id}.py")
-    if not tailoring_file.exists():
-        print(f"[!] Cover letter tailoring file not found: {tailoring_file}")
+def build_coverletter(job_id: str) -> Path | None:
+    try:
+        src, tex_out = resolve_document_paths("coverletter", job_id)
+    except FileNotFoundError:
+        expected = document_py("coverletter", job_id)
+        print(f"[!] Cover letter source file not found: {expected}")
         print(f"    Skipping cover letter build.")
         return None
+    if src.parent.name == "tailoring":
+        print(f"[!] Using legacy path {rel_to_root(src)}")
     import coverletter.cl2latex as engine
-    return engine.generate_tex_file(str(tailoring_file))
+    tex_out.parent.mkdir(parents=True, exist_ok=True)
+    return engine.generate_tex_file(str(src), str(tex_out))
 
 
 def compile_pdf(tex_path: Path) -> None:
@@ -54,15 +75,20 @@ def compile_pdf(tex_path: Path) -> None:
         return
     print(f">>> Compiling PDF: {tex_path.name}")
     for i in range(2):
-        result = subprocess.run(
-            ["pdflatex", "-interaction=nonstopmode", tex_path.name],
-            cwd=tex_path.parent,
-            capture_output=True,
-            text=True,
-        )
+        try:
+            result = subprocess.run(
+                ["pdflatex", "-interaction=nonstopmode", tex_path.name],
+                cwd=tex_path.parent,
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError:
+            print("[x] pdflatex not found on PATH — a LaTeX distribution is required for PDF output.")
+            print("    Install TeX Live (https://tug.org/texlive/) or MiKTeX (https://miktex.org/),")
+            print("    then re-run. Alternatively, drop --pdf/--bundle to generate only the .tex file.")
+            sys.exit(1)
         if result.returncode != 0:
             print(f"[x] pdflatex failed (pass {i+1}):")
-            # Print only the error lines to avoid noise
             for line in result.stdout.split("\n"):
                 if line.startswith("!") or "Error" in line:
                     print(f"    {line}")
@@ -77,8 +103,19 @@ def main():
     parser.add_argument("--only", choices=["resume", "coverletter"],
                         help="Build only resume or only coverletter (default: both)")
     parser.add_argument("--pdf", action="store_true",
-                        help="Also compile .tex → PDF using pdflatex")
+                        help="Also compile .tex -> PDF using pdflatex")
+    parser.add_argument("--bundle", action="store_true",
+                        help="After compiling, move .py/.tex/.pdf into applications/jobs/<id>/ "
+                             "and clean LaTeX temp files (implies --pdf)")
+    add_overlay_cli_flags(parser)
     args = parser.parse_args()
+
+    active = bootstrap_paths(args)
+    print(f">>> Path mode: {'private' if active else 'public'}"
+          f"{' (forced)' if args.overlay is not None else ' (auto)'}")
+
+    if args.bundle:
+        args.pdf = True
 
     resume_path = None
     cl_path = None
@@ -95,13 +132,20 @@ def main():
         if cl_path:
             compile_pdf(cl_path)
 
-    print("\n✓ Build complete.")
+    if args.bundle:
+        from scripts.bundle import finalize_bundle
+        finalize_bundle(args.id)
+        print("\n* Build + bundle complete.")
+        return
+
+    print("\n* Build complete.")
     if resume_path:
-        print(f"  Resume  → {resume_path}")
+        print(f"  Resume  -> {resume_path}")
     if cl_path:
-        print(f"  CL      → {cl_path}")
+        print(f"  CL      -> {cl_path}")
+    out_dir = resume_path.parent if resume_path else document_tex("resume", args.id).parent
     print("\nNext step: compile with pdflatex (run twice for bookmarks)")
-    print(f"  cd {resume_path.parent if resume_path else 'resume/outputs'}")
+    print(f"  cd {out_dir}")
     print(f"  pdflatex {args.id}.tex && pdflatex {args.id}.tex")
 
 

@@ -84,3 +84,28 @@ networking:
     - "Example University"
   communities:
     - "MLOps Community Slack"
+
+# ── Automation / Pipeline ────────────────────────────────────────────────────
+# Controls how far scripts/pipeline.py runs on its own. See docs/adr/0002.
+automation:
+  # discover_only : find + shortlist jobs (writes job stubs, no tailoring)
+  # tailor        : also tailor resume / cover letter / outreach drafts
+  # full_bundle   : also build PDFs, finalize the bundle folder, log as "Saved"
+  autonomy_level: full_bundle
+
+  # Hard ceiling (always enforced at every level): never auto-submit an
+  # application and never auto-send a message. Max action = prepare bundle + log "Saved".
+
+  max_jobs: 5            # default cap for a discovery run
+  build_pdf: true        # compile PDFs (needs pdflatex) during full_bundle
+
+  # Web access backend for discovery/research/contacts (see scripts/web.py).
+  # Must be chosen explicitly — searxng | tavily | brave | serper | harness.
+  # Set it here or via WEB_BACKEND in .env (env wins). Scripts exit with a
+  # clear message when neither is configured.
+  # web_backend: searxng
+
+  # Optional paid contact enrichment is controlled by .env (ENRICHMENT_PROVIDER /
+  # HUNTER_API_KEY) plus CLI --domain — not by this flag. Kept here as a reminder
+  # that enrichment is off by default; the script does not read this key.
+  contact_enrichment: false

@@ -7,7 +7,7 @@ Generated: {DATE}
 - [ ] Find contacts on LinkedIn (search queries below)
 - [ ] Send connection request (copy–paste ready below)
 - [ ] Follow up 3–7 days after they accept (message below)
-- [ ] Apply, then log: `python scripts/track.py log --id {JOB_ID}`
+- [ ] Apply, then log: `uv run scripts/track.py log --id {JOB_ID}`
 
 ---
 

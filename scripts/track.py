@@ -1,28 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
 """
 scripts/track.py
 ----------------
 Log, update, and query job applications in applications/tracker.csv.
-
-Usage:
-    # Log a new application
-    python scripts/track.py log --id google_swe_2026 --platform LinkedIn --url https://...
-
-    # Update status
-    python scripts/track.py update --id google_swe_2026 --status "Phone Screen"
-
-    # Show all applications
-    python scripts/track.py list
-
-    # Show a specific application
-    python scripts/track.py show --id google_swe_2026
-
-    # Show applications by status
-    python scripts/track.py list --status Applied
-
-Valid statuses (in order):
-    Saved → Applied → Recruiter Screen → Phone Screen →
-    Technical Interview → Onsite → Offer → Accepted | Rejected | Withdrawn
 """
 
 import argparse
@@ -31,11 +11,15 @@ import sys
 from datetime import date
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
-from scripts.data_paths import apply_private_overlay, data_path, resolve_path
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
-apply_private_overlay()
+from scripts.bootstrap import init_script
+from scripts.data_paths import data_path
+from scripts.job_info_io import load_job_info
+
+ROOT = init_script()
 TRACKER_CSV = data_path("applications", "tracker.csv")
 
 COLUMNS = [
@@ -75,20 +59,46 @@ def _write_tracker(rows: list[dict]) -> None:
 
 def _job_info(job_id: str) -> dict:
     """Load job metadata from applications/jobs/{id}/job_info.py if available."""
-    job_info_path = resolve_path("applications", "jobs", job_id, "job_info.py")
-    if not job_info_path.exists():
-        return {}
-    import importlib.util
-    spec   = importlib.util.spec_from_file_location("job_info", str(job_info_path))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return {
-        "company":  getattr(module, "COMPANY",  ""),
-        "role":     getattr(module, "ROLE",     ""),
-        "platform": getattr(module, "PLATFORM", ""),
-        "url":      getattr(module, "URL",      ""),
-        "recruiter": getattr(module, "RECRUITER", "") or "",
+    return load_job_info(job_id)
+
+
+def log_saved(
+    job_id: str,
+    *,
+    url: str | None = None,
+    company: str | None = None,
+    role: str | None = None,
+    platform: str | None = None,
+    status: str = "Saved",
+) -> bool:
+    """Log an application to tracker.csv. Returns False if the id already exists."""
+    rows = _read_tracker()
+    if any(r["id"] == job_id for r in rows):
+        print(f"  [track] {job_id} already tracked; leaving status unchanged.")
+        return False
+    if status not in STATUS_VALUES:
+        raise ValueError(f"Invalid status {status!r}. Valid: {', '.join(STATUS_VALUES)}")
+
+    info = load_job_info(job_id)
+    today = date.today().isoformat()
+    date_applied = "" if status == "Saved" else today
+    row = {
+        "id":             job_id,
+        "company":        company or info.get("company", ""),
+        "role":           role or info.get("role", ""),
+        "platform":       platform or info.get("platform", ""),
+        "url":            url or info.get("url", ""),
+        "date_applied":   date_applied,
+        "status":         status,
+        "last_updated":   today,
+        "recruiter":      info.get("recruiter", ""),
+        "resume_version": job_id,
+        "notes":          "",
     }
+    rows.append(row)
+    _write_tracker(rows)
+    print(f"  [track] logged {job_id} as {status}.")
+    return True
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -116,7 +126,7 @@ def cmd_log(args) -> None:
         "role":           args.role    or info.get("role",    ""),
         "platform":       args.platform or info.get("platform", ""),
         "url":            args.url      or info.get("url",      ""),
-        "date_applied":   today,
+        "date_applied":   "" if status == "Saved" else today,
         "status":         status,
         "last_updated":   today,
         "recruiter":      args.recruiter or info.get("recruiter", ""),
@@ -141,6 +151,8 @@ def cmd_update(args) -> None:
                     print(f"[x] Invalid status. Valid: {', '.join(STATUS_VALUES)}")
                     sys.exit(1)
                 row["status"] = args.status
+                if args.status == "Applied" and not (row.get("date_applied") or "").strip():
+                    row["date_applied"] = date.today().isoformat()
             if args.notes:
                 row["notes"] = args.notes
             if args.recruiter:

@@ -1,33 +1,30 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
 """
 scripts/job_discovery.py
 ------------------------
-AI-powered job discovery: finds open positions matching your profile,
-then runs the full ai_tailor.py pipeline for each one.
+Job discovery library: find open positions matching your profile.
 
-For every discovered job you get:
-  - Tailored resume (.py tailoring file + built .tex)
-  - Tailored cover letter
-  - Ready-to-send outreach messages (connection request, follow-up, cold email)
-  - Application logged in tracker.csv
+Search/fetch go through ``scripts/web.py`` when ``use_project_web=True``
+(ADR 0004). Backend is ``WEB_BACKEND`` in ``.env`` (searxng / tavily / brave /
+serper / harness). Agents with harness-native web should search themselves and
+call ``ai_tailor`` per job — do not use this module's web path then.
 
-Usage:
-    uv run scripts/job_discovery.py                      # uses config defaults
-    uv run scripts/job_discovery.py --max 5              # limit to 5 jobs
-    uv run scripts/job_discovery.py --query "CUDA inference engineer remote"
-    uv run scripts/job_discovery.py --max 10 --dry-run   # search only, no files
+There is **no CLI** here. Scripted discovery runs via ``pipeline.py``:
+
+    uv run scripts/pipeline.py --level tailor --max 5 --use-project-web
+    uv run scripts/pipeline.py --dry-run --max 5 --use-project-web
+
+Exports used by pipeline: ``discover_jobs``, ``fetch_jd``, ``_make_id``.
 
 Requirements:
-    Configure LLM in .env — see .env.example (anthropic, ollama, or openai-compatible).
-    Live web search in discovery requires LLM_PROVIDER=anthropic.
+    Configure LLM in .env for ranking.
+    For web I/O: ``use_project_web=True`` plus ``WEB_BACKEND`` (+ keys / SearXNG /
+    ``HARNESS_WEB_*_CMD`` when backend is harness).
 """
 
-import argparse
 import datetime
-import json
 import re
 import sys
-import textwrap
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -36,14 +33,12 @@ sys.path.insert(0, str(ROOT))
 import yaml
 
 from scripts.data_paths import apply_private_overlay, data_path, resolve_path
-from scripts.ai_tailor import DEFAULT_MODEL, tailor, _parse_json
+from scripts.json_llm import call_json
 from scripts.llm_provider import (
-    anthropic_web_search_complete,
-    complete,
     load_env,
     resolve_provider,
-    supports_web_search,
 )
+from scripts import web
 
 load_env()
 apply_private_overlay()
@@ -57,7 +52,7 @@ def _load_config() -> dict:
 
 
 def _profile_summary() -> str:
-    """One-paragraph profile summary for the search prompt."""
+    """One-paragraph profile summary for the ranking prompt."""
     from profile.header import HEADER
     from profile.master_data import EXPERIENCE_REGISTRY, PROJECT_REGISTRY, SUMMARIES
     exp_list  = ", ".join(
@@ -72,120 +67,219 @@ def _profile_summary() -> str:
     )
 
 
-# ── Phase 1: Discover jobs ────────────────────────────────────────────────────
+# ── Build search queries from config ──────────────────────────────────────────
 
-def discover_jobs(query: str | None, max_jobs: int, model: str, cfg: dict) -> list[dict]:
-    """Find open job postings via LLM (web search when provider=anthropic)."""
-    print(f"\n{'='*60}")
-    print(f"  Job Discovery (max {max_jobs} jobs)")
-    print(f"  Provider: {resolve_provider()}")
-    print(f"{'='*60}")
+_MAX_ROLE_QUERIES = 8
+_MAX_COMPANY_QUERIES = 6
 
-    target_roles     = cfg.get("target_roles", {}).get("primary", ["ML Engineer", "AI Engineer"])
-    target_companies = (
-        cfg.get("target_companies", {}).get("tier_1", []) +
-        cfg.get("target_companies", {}).get("tier_2", [])
-    )[:12]
-    search_must      = cfg.get("search_terms", {}).get("must_include_one_of", ["machine learning"])
-    location_prefs   = cfg.get("profile", {}).get("preferred_locations", ["Remote"])
 
+def _build_queries(cfg: dict, query: str | None) -> list[str]:
+    """Build web search queries from config (or a single --query override).
+
+    Mixes primary roles with ``search_terms.must_include_one_of`` so results are
+    closer to the campaign prefs; ranking still decides final shortlist.
+    """
     if query:
-        search_directive = f"Search for: {query}"
-    else:
-        roles_str     = ", ".join(target_roles)
-        companies_str = ", ".join(target_companies[:8])
-        keywords_str  = ", ".join(search_must[:5])
-        locations_str = ", ".join(location_prefs[:3])
-        search_directive = (
-            f"Search for currently open positions with these roles: {roles_str}. "
-            f"Prioritize these companies: {companies_str}. "
-            f"Must involve: {keywords_str}. "
-            f"Preferred locations: {locations_str}."
-        )
+        return [query]
+    year = datetime.date.today().year
+    roles = cfg.get("target_roles", {}).get("primary", ["ML Engineer", "AI Engineer"])
+    companies = (
+        cfg.get("target_companies", {}).get("tier_1", [])
+        + cfg.get("target_companies", {}).get("tier_2", [])
+    )
+    locations = cfg.get("profile", {}).get("preferred_locations", ["Remote"])
+    loc = locations[0] if locations else "Remote"
+    must = [
+        t for t in cfg.get("search_terms", {}).get("must_include_one_of", [])
+        if isinstance(t, str) and t.strip()
+    ]
+    terms = must[:4] or [""]  # at least one pass without a keyword
 
+    queries: list[str] = []
+    # Rotate role × must_include term until we hit the role-query cap.
+    for i, role in enumerate(roles[:3]):
+        term = terms[i % len(terms)]
+        if term:
+            queries.append(f"{role} {term} jobs {loc} {year}")
+        else:
+            queries.append(f"{role} jobs {loc} {year}")
+        if len(queries) >= _MAX_ROLE_QUERIES:
+            break
+    # Extra role queries for remaining must terms (same first role).
+    if roles and must and len(queries) < _MAX_ROLE_QUERIES:
+        primary = roles[0]
+        for term in must[len(roles[:3]):]:
+            queries.append(f"{primary} {term} jobs {loc} {year}")
+            if len(queries) >= _MAX_ROLE_QUERIES:
+                break
+
+    primary_role = roles[0] if roles else "ML Engineer"
+    anchor_term = must[0] if must else ""
+    for company in companies[:_MAX_COMPANY_QUERIES]:
+        if not company:
+            continue
+        if anchor_term:
+            queries.append(f"{company} {primary_role} {anchor_term}")
+        else:
+            queries.append(f"{company} careers {primary_role}")
+    return queries
+
+
+def _search_prefs_block(cfg: dict) -> str:
+    """Format campaign prefs for the ranking prompt (LLM decides; no hard filter)."""
+    roles_cfg = cfg.get("target_roles", {}) or {}
+    terms = cfg.get("search_terms", {}) or {}
+    primary = roles_cfg.get("primary") or []
+    secondary = roles_cfg.get("secondary") or []
+    avoid = roles_cfg.get("avoid") or []
+    must = terms.get("must_include_one_of") or []
+    nice = terms.get("nice_to_have") or []
+    exclude = terms.get("exclude") or []
+
+    def _join(xs: list) -> str:
+        return ", ".join(str(x) for x in xs if x) or "(none)"
+
+    return (
+        "SEARCH PREFERENCES (from job_search_config.yaml):\n"
+        f"- Prefer roles: {_join(primary)}\n"
+        f"- Also consider: {_join(secondary)}\n"
+        f"- Avoid roles: {_join(avoid)}\n"
+        f"- Must include at least one of: {_join(must)}\n"
+        f"- Nice to have: {_join(nice)}\n"
+        f"- Exclude / downrank: {_join(exclude)}\n"
+        "Prefer postings that look like real open jobs matching these prefs. "
+        "Downrank articles, list pages, avoid-roles, and exclude phrases — "
+        "but you still decide; do not invent URLs."
+    )
+
+
+# ── Phase 1a: gather candidate postings via web search ────────────────────────
+
+def _gather_candidates(queries: list[str], per_query: int = 6) -> list[dict]:
+    seen: set[str] = set()
+    candidates: list[dict] = []
+    for q in queries:
+        try:
+            results = web.search(q, max_results=per_query, use_project_web=True)
+        except Exception as e:  # noqa: BLE001 — one bad query shouldn't kill discovery
+            print(f"  [warn] search failed for {q!r}: {e}")
+            continue
+        for r in results:
+            url = r.get("url", "")
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            candidates.append(r)
+    return candidates
+
+
+# ── Phase 1b: rank/structure candidates with the LLM ──────────────────────────
+
+def _rank_candidates(
+    candidates: list[dict],
+    max_jobs: int,
+    model: str,
+    cfg: dict | None = None,
+) -> list[dict]:
+    if not candidates:
+        return []
+    cfg = cfg or {}
     profile_str = _profile_summary()
-
-    system_prompt = textwrap.dedent("""\
-        You are a job search assistant. Use web_search to find real, currently open
-        job postings. For each job, verify it is open (not expired/filled).
-        Return ONLY a JSON array, no markdown fences.""")
-
-    user_prompt = f"""Find {max_jobs} currently open job postings for this candidate.
-
-CANDIDATE PROFILE:
+    prefs = _search_prefs_block(cfg)
+    listing = "\n".join(
+        f"{i}. {c.get('title','')} | {c.get('url','')}\n   {c.get('snippet','')[:200]}"
+        for i, c in enumerate(candidates, 1)
+    )
+    system = (
+        "You are a job search assistant. From a list of real search results, select the "
+        "postings that best match the candidate and campaign preferences and that look "
+        "like actual open job postings (not articles or list pages). "
+        "Return ONLY a JSON array, no prose."
+    )
+    user = f"""CANDIDATE PROFILE:
 {profile_str}
 
-SEARCH DIRECTIVE:
-{search_directive}
+{prefs}
 
-For each job found:
-1. Search for the actual posting URL
-2. Verify it's currently open
-3. Score relevance 1-10 against the candidate's profile
+SEARCH RESULTS (use ONLY these URLs exactly as given):
+{listing}
 
-Return a JSON array, sorted by relevance (highest first):
+Return up to {max_jobs} best matches as a JSON array, sorted by relevance (highest first):
 [
   {{
     "company": "Company Name",
-    "role": "Exact job title",
-    "url": "https://direct-link-to-posting",
+    "role": "Job title",
+    "url": "one of the URLs above, copied exactly",
     "location": "City, State or Remote",
     "relevance_score": 9,
-    "relevance_reason": "Strong match because...",
-    "key_match": "Top 3 matching skills/requirements"
-  }},
-  ...
+    "relevance_reason": "why it matches",
+    "key_match": "top matching skills"
+  }}
 ]
-
-Only include jobs where relevance_score >= 7."""
-
-    if supports_web_search():
-        print("  Searching for jobs with web search...")
-        raw = anthropic_web_search_complete(system_prompt, user_prompt, model, max_tokens=4096)
-    else:
-        print("  [note] Web search unavailable without LLM_PROVIDER=anthropic.")
-        print("         Using local model only — verify URLs manually before applying.")
-        fallback_user = user_prompt + textwrap.dedent("""
-
-        IMPORTANT: You cannot browse the web. Return a JSON array of plausible
-        currently-open postings you believe match the search directive. Use well-known
-        career-page URL patterns where possible. Mark uncertain entries with
-        relevance_score 7 only if reasonably confident.""")
-        raw = complete(system_prompt, fallback_user, model, max_tokens=4096)
-
+Only include items with relevance_score >= 7. Do not invent URLs."""
     try:
-        jobs = _parse_json(raw)
-        if not isinstance(jobs, list):
-            jobs = []
-    except Exception as e:
-        print(f"  [warn] Could not parse job list: {e}")
-        print(f"  Raw response: {raw[:500]}")
-        jobs = []
+        ranked = call_json(system, user, model, max_tokens=3000)
+    except Exception as e:  # noqa: BLE001
+        print(f"  [warn] ranking failed: {e}")
+        return []
+    return ranked if isinstance(ranked, list) else []
+
+
+# ── Phase 1: Discover jobs ────────────────────────────────────────────────────
+
+def discover_jobs(
+    query: str | None,
+    max_jobs: int,
+    model: str,
+    cfg: dict,
+    *,
+    use_project_web: bool = False,
+) -> list[dict]:
+    """Find open job postings via scripts/web.py + LLM ranking.
+
+    Requires ``use_project_web=True``. Backend comes from ``WEB_BACKEND``.
+    Queries and the rank prompt incorporate ``search_terms`` / role prefs from cfg.
+    """
+    if not use_project_web:
+        raise RuntimeError(
+            "Discovery via scripts/web.py requires --use-project-web (ADR 0004). "
+            "Use harness-native web from the discover-jobs skill, or pass the flag "
+            "for unattended runs. Set WEB_BACKEND for searxng/tavily/brave/serper/harness."
+        )
+    backend = web.resolve_backend()  # fails fast with a clear message when unset
+
+    print(f"\n{'='*60}")
+    print(f"  Job Discovery (max {max_jobs} jobs)")
+    print(f"  Provider: {resolve_provider()}  |  Web backend: {backend}")
+    print(f"{'='*60}")
+
+    queries = _build_queries(cfg, query)
+    print(f"  Running {len(queries)} search queries via web backend ({backend})...")
+    candidates = _gather_candidates(queries)
+    print(f"  Gathered {len(candidates)} unique candidate URLs; ranking...")
+    jobs = _rank_candidates(candidates, max_jobs, model, cfg)
 
     print(f"\n  Found {len(jobs)} relevant jobs:")
     for i, job in enumerate(jobs, 1):
         score = job.get("relevance_score", "?")
         print(f"  {i:2}. [{score}/10] {job.get('company', '?')} — {job.get('role', '?')}")
         print(f"       {job.get('url', 'no url')[:80]}")
-
     return jobs
 
 
 # ── Phase 2: Fetch JD text for each job ──────────────────────────────────────
 
-def fetch_jd(url: str) -> str | None:
-    """Fetch JD text from URL. Returns None on failure."""
-    import httpx
+def fetch_jd(url: str, *, use_project_web: bool = False) -> str | None:
+    """Fetch JD text via web.fetch() (WEB_BACKEND; needs use_project_web)."""
+    if not use_project_web:
+        print(
+            f"  [warn] Could not fetch {url}: pass --use-project-web for "
+            "scripts/web.py fetch (ADR 0004)."
+        )
+        return None
     try:
-        resp = httpx.get(url, follow_redirects=True, timeout=20,
-                         headers={"User-Agent": "Mozilla/5.0"})
-        resp.raise_for_status()
-        # Strip HTML tags
-        text = re.sub(r"<[^>]+>", " ", resp.text)
-        text = re.sub(r"[ \t]+", " ", text)
-        text = re.sub(r"\n{3,}", "\n\n", text)
-        return text[:10000]
-    except Exception as e:
+        return web.fetch(url, max_chars=10000, use_project_web=True)
+    except Exception as e:  # noqa: BLE001
         print(f"  [warn] Could not fetch {url}: {e}")
         return None
 
@@ -193,112 +287,29 @@ def fetch_jd(url: str) -> str | None:
 # ── ID generator ─────────────────────────────────────────────────────────────
 
 def _make_id(company: str, role: str) -> str:
-    """Generate a clean application ID from company + role."""
+    """Generate a clean application ID from company + role.
+
+    Checks resume/outputs/, legacy resume/tailoring/, and applications/jobs/
+    for existing IDs so orphaned job dirs don't get reused.
+    """
     year = datetime.date.today().year
     co   = re.sub(r"[^a-z0-9]", "_", company.lower())[:12].strip("_")
     ro   = re.sub(r"[^a-z0-9]", "_", role.lower().split(",")[0])[:15].strip("_")
     ro   = re.sub(r"_+", "_", ro)
     base = f"{co}_{ro}_{year}"
-    # Avoid collisions
     counter = 0
     candidate = base
-    existing = {p.stem for p in data_path("resume", "tailoring").glob("*.py")}
+    existing_sources = {p.stem for p in data_path("resume", "outputs").glob("*.py")}
+    existing_legacy = {p.stem for p in data_path("resume", "tailoring").glob("*.py")}
+    # Archived tailor versions use "id (n)" — treat base id as taken if any match.
+    existing_sources |= {
+        p.stem.split(" (")[0] for p in data_path("resume", "outputs").glob("*.py")
+        if " (" in p.stem
+    }
+    jobs_dir = data_path("applications", "jobs")
+    existing_jobs = {p.name for p in jobs_dir.iterdir() if p.is_dir()} if jobs_dir.exists() else set()
+    existing = existing_sources | existing_legacy | existing_jobs
     while candidate in existing:
         counter += 1
         candidate = f"{base}_{counter}"
     return candidate
-
-
-# ── Main ──────────────────────────────────────────────────────────────────────
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="AI-powered job discovery + auto-tailoring pipeline.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=textwrap.dedent("""\
-            Examples:
-              uv run scripts/job_discovery.py
-              uv run scripts/job_discovery.py --max 5 --dry-run
-              uv run scripts/job_discovery.py --query "LLM inference engineer remote 2026"
-        """)
-    )
-    parser.add_argument("--query",   default=None, help="Custom search query (overrides config defaults)")
-    parser.add_argument("--max",     type=int, default=5, help="Max jobs to discover and tailor (default: 5)")
-    parser.add_argument("--model",   default=DEFAULT_MODEL,
-                        help=f"Model override (default from .env: {DEFAULT_MODEL}, provider: {resolve_provider()})")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Discover and print jobs only; skip tailoring and file creation")
-    parser.add_argument("--build",   action="store_true",
-                        help="Also compile .tex → PDF after tailoring each job")
-    args = parser.parse_args()
-
-    cfg  = _load_config()
-    jobs = discover_jobs(args.query, args.max, args.model, cfg)
-
-    if not jobs:
-        print("\n  No jobs found. Try --query with different keywords, or check your config.")
-        sys.exit(0)
-
-    if args.dry_run:
-        print("\n[dry-run] Stopping after discovery. No tailoring files written.")
-        sys.exit(0)
-
-    # ── Tailor each job ───────────────────────────────────────────────────────
-    summary_rows = []
-    for job in jobs:
-        url     = job.get("url", "")
-        company = job.get("company", "Unknown")
-        role    = job.get("role", "Unknown Role")
-        job_id  = _make_id(company, role)
-
-        print(f"\n{'─'*60}")
-        print(f"  Processing: {company} — {role}")
-        print(f"  ID: {job_id}")
-
-        jd_text = fetch_jd(url) if url else None
-        if not jd_text:
-            print(f"  [skip] Could not fetch JD text for {url}")
-            continue
-
-        try:
-            results = tailor(job_id, jd_text, args.model, dry_run=False)
-            real_company = results["jd"].get("company", company)
-            real_role    = results["jd"].get("role", role)
-
-            # Update URL from job discovery result
-            job_info_path = data_path("applications", "jobs", job_id, "job_info.py")
-            if job_info_path.exists():
-                content = job_info_path.read_text()
-                content = content.replace('URL         = ""', f'URL         = "{url}"', 1)
-                job_info_path.write_text(content)
-
-            if args.build:
-                import scripts.build as build_mod
-                build_mod.build_resume(job_id)
-                build_mod.build_coverletter(job_id)
-
-            summary_rows.append({"id": job_id, "company": real_company, "role": real_role,
-                                  "url": url, "status": "✓ tailored"})
-        except Exception as e:
-            print(f"  [error] Tailoring failed for {job_id}: {e}")
-            summary_rows.append({"id": job_id, "company": company, "role": role,
-                                  "url": url, "status": f"✗ {e}"})
-
-    # ── Summary ───────────────────────────────────────────────────────────────
-    print(f"\n{'='*60}")
-    print("  DISCOVERY COMPLETE")
-    print(f"{'='*60}")
-    print(f"\n  {'ID':<35} {'Status':<12} {'Company'}")
-    print(f"  {'─'*35} {'─'*12} {'─'*20}")
-    for row in summary_rows:
-        print(f"  {row['id']:<35} {row['status']:<12} {row['company']}")
-
-    print(f"\n  Next steps for each job:")
-    print(f"  1. Review:  resume/tailoring/<id>.py")
-    print(f"  2. Review:  applications/jobs/<id>/outreach.md")
-    print(f"  3. Build:   uv run scripts/build.py --id <id> --pdf")
-    print(f"  4. Apply + log: uv run scripts/track.py log --id <id> --platform <p> --url <url>")
-
-
-if __name__ == "__main__":
-    main()

@@ -27,14 +27,15 @@ SALARY_RANGE   = ""    # As listed in the posting, e.g. "$150k–$200k"
 TEAM           = ""    # Team/org within company, e.g. "Google DeepMind Gemini team"
 
 # ── Application Status ────────────────────────────────────────────────────────
-# This is the ground truth; tracker.csv is updated by scripts/track.py
-STATUS         = "Applied"
+# Informational only — tracker.csv (via scripts/track.py) is the source of truth;
+# track.py does not read this field.
+STATUS         = "Saved"
 
 # ── Notes & Context ───────────────────────────────────────────────────────────
 NOTES = ""
 
 # ── JD Keywords (copy from job description) ──────────────────────────────────
-# Use these to align bullet points in resume/tailoring/<id>.py.
+# Use these to align bullet points in resume/outputs/<id>.py.
 # Cross-check against your master_data.py entries before tailoring.
 KEYWORDS = [
     # "CUDA kernel optimization",

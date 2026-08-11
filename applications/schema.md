@@ -12,7 +12,7 @@ Updated automatically by `scripts/track.py`. Do not edit manually unless correct
 | `role`          | string   | Job title as listed in the posting                                | `Software Engineer, ML`          |
 | `platform`      | string   | Where you applied (see valid values below)                        | `LinkedIn`                       |
 | `url`           | string   | Direct link to the job posting                                    | `https://careers.google.com/...` |
-| `date_applied`  | date     | ISO 8601 date (YYYY-MM-DD)                                        | `2026-06-09`                     |
+| `date_applied`  | date     | ISO date when status became Applied (empty while Saved) | `2026-06-09`                     |
 | `status`        | string   | Current status (see STATUS_VALUES below)                          | `Phone Screen`                   |
 | `last_updated`  | date     | ISO 8601 date of last status change                               | `2026-06-15`                     |
 | `recruiter`     | string   | Recruiter name if known                                           | `Jane Doe`                       |
