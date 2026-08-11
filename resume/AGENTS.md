@@ -7,18 +7,20 @@ resume/
 ├── cv_utils.py          # Dataclass and Enum definitions ONLY — no personal data
 ├── cv2latex.py          # Jinja2 → LaTeX engine; do not edit for tailoring
 ├── tailoring/
-│   ├── _template.py     # Master template — copy to create a new version
-│   └── {id}.py          # One file per job application
+│   └── _template.py     # Scaffold template — copied into outputs/{id}.py
 └── outputs/
-    └── {id}.tex         # Generated LaTeX files (gitignored)
+    ├── {id}.py          # Per-job source (select + replace)
+    ├── {id}.tex         # Generated LaTeX (gitignored)
+    └── {id}.pdf         # Compiled PDF (gitignored)
 ```
 
 ## Key Conventions
 
-- Tailoring files expose a `cv_data` variable of type `CV`.
-- The `active` flag on `ExperienceEntry`/`ProjectEntry` is set to `True` by default in master_data. Control visibility by **selecting** entries in the tailoring file list, not by setting `active=False`.
+- Per-job files expose a `cv_data` variable of type `CV`.
+- Paths are overlay-aware: with `private/` present they live under `private/resume/outputs/`.
+- `build.py` always writes `.tex` via `data_path` (never the public tree when overlay is on).
 - Use `dataclasses.replace(ENTRY, highlights=[...])` for per-job bullet overrides.
-- `OUTPUT_FILE` in every tailoring file must be `f"resume/outputs/{JOB_ID}.tex"`.
+- After `--bundle`, `.py` / `.tex` / `.pdf` move into `applications/jobs/{id}/` as `{id}_resume.*`.
 
 ## Writing Override Bullets
 
@@ -32,23 +34,26 @@ without inventing facts.
 ## Build Command
 
 ```bash
-python scripts/build.py --id <id>            # generate .tex
-python scripts/build.py --id <id> --pdf      # also compile to PDF
+uv run scripts/build.py --id <id>                   # generate .tex beside the .py
+uv run scripts/build.py --id <id> --pdf             # also compile to PDF
+uv run scripts/build.py --id <id> --bundle          # pdf + move .py/.tex/.pdf into the job bundle
+uv run scripts/build.py --id <id> --private --pdf   # force private/ paths
+uv run resume/cv2latex.py --id <id> --private       # engine-only, same path routing
 ```
 
 ## Common LaTeX Pitfalls
 
 Escape these characters in bullet point strings:
-- `&`  →  `\\&`     (e.g. "Weights \\& Biases")
-- `%`  →  `\\%`     (e.g. "reduced cost by 40\\%")
-- `_`  →  `\\_`     (e.g. "model\\_name")
-- `#`  →  `\\#`
-- `$`  →  `\\$`
+- `&` → `\\&` (e.g. "Weights \\& Biases")
+- `%` → `\\%` (e.g. "reduced cost by 40\\%")
+- `_` → `\\_` (e.g. "model\\_name")
+- `#` → `\\#`
+- `$` → `\\$`
 
 ## Adding a New Section
 
 1. Add a `show_*: bool` to `SectionConfig` in `cv_utils.py`
-2. Add a `\newboolean{show*}` and `\setboolean{}` block in `LATEX_PREAMBLE` in `cv2latex.py`
+2. Add the `\newboolean{show*}` and `\setboolean{}` block in `LATEX_PREAMBLE` in `cv2latex.py`
 3. Add the `\ifthenelse{\boolean{show*}}{...}{}` block in `LATEX_BODY`
 4. Add the corresponding field to the `CV` dataclass in `cv_utils.py`
 5. Export the new field from `profile/master_data.py`

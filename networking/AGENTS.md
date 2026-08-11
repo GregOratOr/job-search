@@ -29,7 +29,7 @@ Valid `status` values:
 Manually append a row to `networking/connections.csv`, or use:
 ```bash
 # After logging the application:
-python scripts/track.py update --id google_swe_2026 \
+uv run scripts/track.py update --id google_swe_2026 \
     --notes "Connected with Jane Doe (ML Eng) on LinkedIn 2026-06-09"
 ```
 

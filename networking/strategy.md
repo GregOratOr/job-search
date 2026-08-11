@@ -22,15 +22,15 @@ search
 
 1. **Search from the job posting**: click the company name → "People" tab → filter by:
    - Title keywords: `ML Engineer`, `Research Engineer`, `Software Engineer`
-   - School: `Oregon State University` or `Vishwakarma Institute of Technology` (shared alumni first)
+   - School: your universities (see `networking.alumni_networks` in the config — shared alumni first)
    - Connections: check 2nd degree first (mutual intro is more effective)
 
 2. **Use advanced search** (LinkedIn Premium or Boolean):
-   - `site:linkedin.com/in/ "ML Engineer" "NVIDIA" "Oregon State"`
+   - `site:linkedin.com/in/ "ML Engineer" "NVIDIA" "Your University"`
    - `"Machine Learning" AND "PyTorch" AND "NVIDIA" site:linkedin.com/in/`
 
 3. **Target personas** (in order of warmth):
-   - OSU / VIT alumni at the company ← highest response rate
+   - Alumni from your universities at the company ← highest response rate
    - Hiring manager for the team (usually Director/Manager of ML Eng)
    - A peer ML engineer on the relevant team
    - Recruiter at the company (helpful for interview prep info, less for technical referrals)
@@ -47,7 +47,7 @@ Use the templates in `networking/message_templates.md` → "Connection Request" 
 **Character limit**: 300 characters. Be direct, mention the shared context.
 
 Examples:
-- Alumni angle: "Hi [Name], fellow OSU alum here. I'm exploring ML Engineer roles at NVIDIA — would love to connect!"
+- Alumni angle: "Hi [Name], fellow [University] alum here. I'm exploring ML Engineer roles at NVIDIA — would love to connect!"
 - Shared tech angle: "Hi [Name], I came across your work on [project/paper]. Impressed by [specific thing] — would love to be in your network."
 - Direct ask (for warm connections only): "Hi [Name], [mutual connection] suggested I reach out. Applying to [role] at [company] — would you be open to a quick chat?"
 
@@ -99,7 +99,7 @@ Always send a thank-you message within 24h.
 Log every contact in `networking/connections.csv`:
 
 ```
-python scripts/track.py log --id google_swe_2026 \
+uv run scripts/track.py log --id google_swe_2026 \
     --notes "Referred by Jane Doe (jane@gmail.com)"
 ```
 
@@ -129,7 +129,7 @@ date,name,company,title,linkedin_url,status,notes
 ## LinkedIn Profile Optimization
 
 Keep your profile in sync with your best resume version:
-- **Headline**: "M.S. AI @ OSU | ML Engineer | PyTorch · CUDA · LLMs"
+- **Headline**: "M.S. AI @ [University] | ML Engineer | PyTorch · CUDA · LLMs"
 - **About**: 3–4 sentences: who you are → what you build → what you're looking for
 - **Open to Work**: turn on (visible to recruiters, not your network, to avoid awkwardness)
 - **Featured**: pin your best project (GitHub or a live demo)

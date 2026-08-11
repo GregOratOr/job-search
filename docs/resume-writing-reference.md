@@ -163,7 +163,7 @@ Systematized, Tabulated, Unified, Updated, Utilized, Validated, Verified
 
 ## 4. Per-section guidance
 
-How the rules above apply to each entry type in `profile/` and `resume/tailoring/{id}.py`.
+How the rules above apply to each entry type in `profile/` and `resume/outputs/{id}.py`.
 
 ### Experience (`highlights`)
 

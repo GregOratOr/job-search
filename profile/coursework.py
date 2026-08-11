@@ -10,12 +10,9 @@ COURSEWORK_EXAMPLE_MS = CourseworkEntry(
     title        = "Example University --- M.S. Artificial Intelligence",
     use_multicol = True,
     courses      = [
-        "Deep Learning",
-        "Computer Vision",
-        "Natural Language Processing",
-        "Machine Learning",
-        "Multiagent Systems",
-        "Algorithms",
+        "Course 1",
+        "Course 2",
+        "Course 3"
     ]
 )
 
@@ -23,11 +20,8 @@ COURSEWORK_EXAMPLE_BTECH = CourseworkEntry(
     title        = "Example Institute of Technology --- B.Tech Computer Engineering",
     use_multicol = True,
     courses      = [
-        "Data Structures",
-        "Algorithms",
-        "Data Science",
-        "Database Management",
-        "Operating Systems",
-        "Linear Algebra",
+        "Course 1",
+        "Course 2",
+        "Course 3"
     ]
 )

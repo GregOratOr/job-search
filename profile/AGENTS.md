@@ -9,13 +9,13 @@ only the relevant file.
 ```
 profile/
 ├── header.py       ← HEADER (CV) + CL_HEADER (cover letter) — contact info
-├── education.py    ← OSU_MS, VIT_BTECH — degree entries
-├── experience.py   ← AI_INTEGRATOR_DAKDAN, ... — work history (run --inventory for live list)
-├── projects.py     ← PROJ_XRAY_DENOISING_CAPSTONE, ... — project portfolio (run --inventory)
+├── education.py    ← EXAMPLE_UNIV_MS, EXAMPLE_UNIV_BTECH — degree entries (run --inventory for live list)
+├── experience.py   ← EXAMPLE_ML_ENGINEER_ACME, ... — work history (run --inventory)
+├── projects.py     ← PROJ_EXAMPLE_ML_PIPELINE, ... — project portfolio (run --inventory)
 ├── skills.py       ← SKILLS_FULL, SKILLS_ML_FOCUSED, etc. — skill presets
 ├── summaries.py    ← SUMMARIES dict — professional summary variants
-├── research.py     ← research entries (empty until first paper)
-├── coursework.py   ← COURSEWORK_OSU, COURSEWORK_VIT
+├── research.py     ← RESEARCH_EXAMPLE_RL, ... — research entries
+├── coursework.py   ← COURSEWORK_EXAMPLE_MS, COURSEWORK_EXAMPLE_BTECH
 ├── master_data.py  ← thin re-export of all the above (import point for tailoring files)
 └── CHANGELOG.md    ← append one line here after EVERY edit to any profile file
 ```
@@ -23,10 +23,15 @@ profile/
 ## Golden Rule
 
 **This directory is READ-ONLY for agents unless the user gives an explicit command in the
-current conversation to change a specific profile file.** Tailoring, keyword rewrites, and
-job-specific edits must NEVER modify anything here — they go into `resume/tailoring/{id}.py`
-via `dataclasses.replace()`. Only edit `profile/` when the user explicitly asks to update
-their profile (then follow the workflows below and append to `CHANGELOG.md`).
+current conversation that names what to change** (a role, project, skill, summary, or
+contact field). Ambiguous "make my resume stronger" asks are *not* a gate — use
+`tailor-resume`. Follow `skills/update-profile/SKILL.md` for the gated checklist
+(inventory → edit → registry → validate → CHANGELOG).
+
+When the private overlay is live, edit `private/profile/` — that is the source of truth.
+
+**Add and edit only** by default. Renames and deletes need an extra explicit confirm;
+they can break existing `resume/outputs/<id>.py` imports.
 
 Only add data here. **Never** add data to tailoring files directly.
 When a tailoring file needs a new bullet variation, use `dataclasses.replace()`.
@@ -58,8 +63,9 @@ Quick reference:
 2. Copy the template block at the top of the file
 3. Fill in `role`, `company`, `date`, and `highlights`
 4. Choose a variable name: `COMPANY_ROLE_YEAR` (e.g. `NVIDIA_INTERN_2026`)
-5. Add the variable name to the `__all__` export list in `profile/master_data.py`
-6. Append to `profile/CHANGELOG.md`:
+5. Register in `profile/master_data.py`: `EXPERIENCE_REGISTRY` **and** `__all__`
+6. Run `uv run scripts/validate_profile.py`
+7. Append to `profile/CHANGELOG.md`:
    `| YYYY-MM-DD | experience.py | Added NVIDIA_INTERN_2026 (NVIDIA Intern, Jun 2026) |`
 
 ### Add a new project
@@ -68,15 +74,16 @@ Quick reference:
 2. Copy the template block
 3. Fill in `title`, `organization`, `date`, and `highlights`
 4. Variable name: `PROJ_{SHORTNAME}` (e.g. `PROJ_DIFFUSION_2026`)
-5. Add to `profile/master_data.py` imports and `__all__`
-6. Append to `profile/CHANGELOG.md`
+5. Register in `profile/master_data.py`: `PROJECT_REGISTRY` **and** `__all__`
+6. Run `uv run scripts/validate_profile.py`
+7. Append to `profile/CHANGELOG.md`
 
 ### Update an existing bullet point
 
 1. Open the relevant file (e.g. `profile/experience.py`)
 2. Edit the specific string in the `highlights` list
 3. Append to `profile/CHANGELOG.md`:
-   `| YYYY-MM-DD | experience.py | Updated AI_INTEGRATOR_DAKDAN bullet 2 (added metric) |`
+   `| YYYY-MM-DD | experience.py | Updated EXAMPLE_ML_ENGINEER_ACME bullet 2 (added metric) |`
 
 ### Update contact info
 
@@ -103,10 +110,10 @@ Quick reference:
 
 After any edit, run:
 ```bash
-python scripts/update_profile.py
+uv run scripts/validate_profile.py
 ```
 This validates all imports, shows the full inventory, and lists recent changelog entries.
 For a quick import-only check:
 ```bash
-python scripts/update_profile.py --validate
+uv run scripts/validate_profile.py --validate
 ```

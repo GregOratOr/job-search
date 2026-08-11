@@ -12,13 +12,13 @@ coursework.py, master_data.py, CHANGELOG.md) unless the user gives an **explicit
 in this conversation to change a specific profile file**.
 
 - Tailoring (rewriting bullets, adding keywords, picking entries) NEVER edits `profile/`.
-  All job-specific changes go downstream into `resume/tailoring/{id}.py` and
-  `coverletter/tailoring/{id}.py` via `dataclasses.replace()`.
+  All job-specific changes go downstream into `resume/outputs/{id}.py` and
+  `coverletter/outputs/{id}_cl.py` via `dataclasses.replace()`.
 - The ONLY time you may write to `profile/` is when the user explicitly asks to update
   their profile (e.g. "add my new NVIDIA internship"). Then follow the "Update Your
   Profile" workflow below and append to `profile/CHANGELOG.md`.
 - The real, current entry variable names are NOT the illustrative examples in these docs.
-  Always discover them at runtime with: `python scripts/update_profile.py --inventory`.
+  Always discover them at runtime with: `uv run scripts/validate_profile.py --inventory`
 
 ## Available Skills
 
@@ -26,23 +26,45 @@ Agent skill wrappers live in `skills/{name}/SKILL.md` (shared by Hermes and Curs
 
 | Skill | Use when |
 |-------|----------|
-| `skills/tailor-resume/SKILL.md`      | Tailor resume + cover letter from a JD/URL |
+| `skills/run-pipeline/SKILL.md`       | Run the scripted batch pipeline honoring `autonomy_level` |
+| `skills/tailor-resume/SKILL.md`      | Tailor a resume from a JD/URL to a built 1-page PDF |
+| `skills/tailor-coverletter/SKILL.md` | Tailor a cover letter (hook/evidence/close) to a built 1-page PDF |
 | `skills/build-documents/SKILL.md`    | Render/compile `.tex` and PDFs |
 | `skills/track-application/SKILL.md`  | Log/update applications in tracker.csv |
-| `skills/new-application/SKILL.md`    | Scaffold a new application bundle |
+| `skills/new-application/SKILL.md`    | Orchestrate a single application end to end (intake → bundle) |
 | `skills/update-profile/SKILL.md`     | Edit `profile/` — ONLY on explicit user command |
-| `skills/discover-jobs/SKILL.md`      | Find open roles (agent web tools) + tailor each |
+| `skills/discover-jobs/SKILL.md`      | Find open roles → shortlist (+ optional handoff to new-application) |
+| `skills/research/SKILL.md`           | Research a company/topic into a sourced brief |
+| `skills/find-contacts/SKILL.md`      | Find recruiters/hiring managers via public pages |
 | `skills/networking-outreach/SKILL.md`| Draft LinkedIn/email outreach from templates |
+| `skills/follow-up/SKILL.md`          | Surface + draft follow-ups for stale applications |
+| `skills/audit-application/SKILL.md`| Critique tailored resume/CL before submitting |
+
+## Web access policy
+
+**Harness-native web first; project web tool as fallback.**
+
+| Context | Web access |
+|---------|------------|
+| Agent harness with built-in search/extract (Hermes, Cursor browser MCP, etc.) | Use the harness tools directly. Do **not** run `scripts/web.py`. |
+| Scripted discovery / research / contacts / `ai_tailor --url` | Pass `--use-project-web`; backend from `WEB_BACKEND` in `.env` |
+| Standalone terminal / bare Ollama / no harness web | `scripts/web.py` with `WEB_BACKEND` configured (`searxng` / `tavily` / … / `harness`) |
+| Agent-driven research or contact-finding | Search and fetch with harness tools; write results to bundle files. Run `scripts/research.py` or `scripts/find_contacts.py` only when no harness web is available. |
+
+See [`docs/adr/0003-project-owned-web-tool.md`](docs/adr/0003-project-owned-web-tool.md) and
+[`okf/architecture/web-access-policy.md`](okf/architecture/web-access-policy.md).
 
 ## Architecture Overview
 
 ```
 job-search/
+├── .cursor/                         # Cursor IDE config (plans/ and rules/)
+├── .vscode/                         # VS Code workspace settings
 ├── profile/                         # ← SINGLE SOURCE OF TRUTH (split into focused modules)
 │   ├── header.py                    #   contact info (HEADER, CL_HEADER)
-│   ├── education.py                 #   OSU_MS, VIT_BTECH
-│   ├── experience.py                #   AI_INTEGRATOR_DAKDAN, ... (run --inventory for live list)
-│   ├── projects.py                  #   PROJ_XRAY_DENOISING_CAPSTONE, ... (run --inventory)
+│   ├── education.py                 #   EXAMPLE_UNIV_MS, EXAMPLE_UNIV_BTECH
+│   ├── experience.py                #   EXAMPLE_ML_ENGINEER_ACME, ... (run --inventory for live list)
+│   ├── projects.py                  #   PROJ_EXAMPLE_CUDA_KERNEL, ... (run --inventory)
 │   ├── skills.py                    #   SKILLS_FULL, SKILLS_ML_FOCUSED, ...
 │   ├── summaries.py                 #   SUMMARIES dict
 │   ├── research.py                  #   research entries
@@ -52,46 +74,81 @@ job-search/
 ├── resume/
 │   ├── cv_utils.py                  # dataclass + enum definitions — no personal data
 │   ├── cv2latex.py                  # Jinja2 → LaTeX engine
-│   └── tailoring/
-│       ├── _template.py             # copy this per job (5 sections to edit)
-│       └── {id}.py                  # per-job tailoring files
+│   ├── tailoring/_template.py       # scaffold only
+│   └── outputs/{id}.py|.tex|.pdf    # per-job source + builds (overlay → private/)
 ├── coverletter/
 │   ├── cl_utils.py                  # cover letter dataclasses
 │   ├── cl2latex.py                  # Jinja2 → LaTeX engine
-│   └── tailoring/
-│       ├── _template.py
-│       └── {id}.py
-├── applications/
-│   ├── tracker.csv                  # master application log
-│   └── jobs/{id}/job_info.py        # per-job metadata, keywords, networking targets
+│   ├── tailoring/_template.py       # scaffold only
+│   └── outputs/{id}_cl.py|.tex|.pdf # per-job source + builds (overlay → private/)
+│   └── jobs/
+│       ├── _template/               # example bundle structure (reference only)
+│       └── {id}/                    # jd, job_info, networking, {id}_resume.*, {id}_cover_letter.*
 ├── networking/
 │   ├── strategy.md                  # 4-step loop: Find→Connect→Engage→Convert
 │   ├── message_templates.md         # LinkedIn/email copy
 │   └── connections.csv
 ├── config/
 │   ├── job_search_config.yaml       # search terms, target companies, platforms
-│   └── platforms.yaml               # per-platform application steps
-├── skills/                          # Hermes agent skills (GregOratOr/skills submodule)
-├── pyproject.toml                   # pip install -e . for clean imports everywhere
+│   └── platforms.yaml               # platform playbook (agent reference; not loaded by scripts)
+├── private/                         # ← git submodule; overlays all of the above with real data
+│   ├── .env                         #   API keys / endpoints (never on a public remote)
+│   ├── profile/                     #   real contact info, experience, projects, skills, summaries
+│   ├── resume/outputs/              #   per-job resume .py/.tex/.pdf
+│   ├── coverletter/outputs/         #   per-job cover letter {id}_cl.py/.tex/.pdf
+│   ├── applications/jobs/           #   real per-job bundles + tracker.csv
+│   ├── config/                      #   real job_search_config.yaml
+│   └── networking/                  #   connections.csv, message templates, strategy
+├── skills/                          # Hermes/Cursor agent skills (one subdir per skill)
+│   ├── audit-application/
+│   ├── build-documents/
+│   ├── discover-jobs/
+│   ├── find-contacts/
+│   ├── follow-up/
+│   ├── networking-outreach/
+│   ├── new-application/
+│   ├── research/
+│   ├── run-pipeline/
+│   ├── tailor-coverletter/
+│   ├── tailor-resume/
+│   ├── track-application/
+│   └── update-profile/
+├── docs/adr/                        # architecture decision records
+├── pyproject.toml                   # uv sync handles deps + virtual env
 └── scripts/
-    ├── new_application.py           # scaffold new application bundle
-    ├── build.py                     # render .tex (optionally compile to PDF)
-    ├── track.py                     # log/update/list applications
-    └── update_profile.py            # validate profile imports + show inventory
+    ├── pipeline.py                  # E2E orchestrator (discover→tailor→research→build→audit→bundle→track)
+    ├── job_discovery.py             # discovery library (discover_jobs / fetch_jd / _make_id)
+    ├── ai_tailor.py                 # JD → tailored resume/CL/outreach (4-phase LLM pipeline)
+    ├── audit.py                     # hiring-manager critique → applications/jobs/<id>/audit.md
+    ├── build.py                     # render .tex (optionally compile to PDF + bundle)
+    ├── bundle.py                    # finalize the per-job upload folder
+    ├── web.py                       # pluggable web search + page fetch (SearXNG/Tavily/Brave/Serper)
+    ├── research.py                  # company/topic research brief via web + LLM
+    ├── find_contacts.py             # contacts via queries + public pages (no LinkedIn scraping)
+    ├── followup.py                  # surface stale apps + draft follow-up messages
+    ├── track.py                     # log/update/list applications in tracker.csv
+    ├── new_application.py           # scaffold new application bundle from templates
+    ├── validate_profile.py          # validate profile imports + show inventory
+    ├── llm_provider.py              # provider-agnostic LLM completions (Anthropic/Ollama/OpenAI)
+    ├── json_llm.py                  # JSON-mode LLM helper shared by the AI tools
+    ├── text_utils.py                # shared text helpers
+    ├── job_info_io.py               # safe reads/writes of per-job job_info.py
+    ├── bootstrap.py                 # shared CLI bootstrap (paths + env)
+    └── data_paths.py                # routes reads/writes to private/ when present
 ```
 
 ## Setup (run once after cloning)
 
 ```bash
-pip install -e .
+uv sync
 ```
 
-This registers the project as a package so every file can import cleanly:
-```python
-from profile.experience import AI_INTEGRATOR_DAKDAN   # works from anywhere
-from resume.cv_utils import CV
+This installs all dependencies and creates the virtual environment. All scripts are then
+run with `uv run`, e.g.:
+```bash
+uv run scripts/validate_profile.py --inventory
 ```
-No `sys.path` hacks needed.
+`uv` handles the virtual environment automatically — no manual activation needed.
 
 ---
 
@@ -104,20 +161,20 @@ When updating contact info, only `profile/header.py` is touched.
 **Tailoring files only SELECT and CONFIGURE — they never contain data.**
 
 ```python
-# CORRECT — resume/tailoring/nvidia_ml_2026.py
+# CORRECT — resume/outputs/nvidia_ml_2026.py
 from dataclasses import replace
 from profile.master_data import *
 
 cv_data = CV(
     experience=[
-        replace(AI_INTEGRATOR_DAKDAN, highlights=["Job-specific rewrite..."]),
-        UNITY_DEV_INGNIOUS,
+        replace(EXAMPLE_ML_ENGINEER_ACME, highlights=["Job-specific rewrite..."]),
+        EXAMPLE_SWE_INTERN_STARTUP,
     ],
-    projects=[PROJ_PMD_CAMERA_CUDA, PROJ_MEDICAL_IMAGE_DENOISING],
+    projects=[PROJ_EXAMPLE_ML_PIPELINE, PROJ_EXAMPLE_CUDA_KERNEL],
     ...
 )
 # Variable names above are illustrative — get the live list with:
-#   python scripts/update_profile.py --inventory
+#   uv run scripts/validate_profile.py --inventory
 
 # WRONG — never duplicate data from profile/
 cv_data = CV(
@@ -132,7 +189,7 @@ cv_data = CV(
 This is the condensed style guide for drafting `highlights` (experience, project, research)
 and `summaries`. It applies in two places:
 1. **Master profile** entries in `profile/*.py` (only on an explicit "update profile" command).
-2. **Per-job rewrites** in `resume/tailoring/{id}.py` via `dataclasses.replace()`.
+2. **Per-job rewrites** in `resume/outputs/{id}.py` via `dataclasses.replace()`.
 
 > 📖 **Full reference:** `docs/resume-writing-reference.md` holds the complete, durable
 > rule set — the entire Harvard MCS guide (resume language, top mistakes, full DO/DON'T
@@ -198,10 +255,10 @@ Pick a verb that matches the work; never reuse the same verb twice in one entry.
 
 ### Formatting rules (apply everywhere)
 
-- Bold key technical terms with `\\textbf{...}` (skills, tools, frameworks, headline metrics).
+- Bold key technical terms with `\textbf{...}` (skills, tools, frameworks, headline metrics).
 - Keep each bullet under ~200 characters so it stays on 1–2 lines in the PDF.
-- Multiplication factor: `2.3\\texttimes{}`. Percentages: `40\\%`.
-- Escape LaTeX specials in all bullet/summary text: `%→\\%`, `&→\\&`, `$→\\$`, `_→\\_`, `#→\\#`.
+- Multiplication factor: `2.3\texttimes{}`. Percentages: `40\%`.
+- Escape LaTeX specials in all bullet/summary text: `%→\%`, `&→\&`, `$→\$`, `_→\_`, `#→\#`.
 
 ---
 
@@ -215,7 +272,7 @@ Pick a verb that matches the work; never reuse the same verb twice in one entry.
 3. Fill in role, company, date, highlights
 4. Name it: NVIDIA_INTERN_2026 = ExperienceEntry(...)
 5. Add to profile/master_data.py: import + __all__
-6. Run: python scripts/update_profile.py   ← validates everything
+6. Run: uv run scripts/validate_profile.py   ← validates everything
 7. Append to profile/CHANGELOG.md:
    | 2026-06-15 | experience.py | Added NVIDIA_INTERN_2026 |
 ```
@@ -228,7 +285,7 @@ Pick a verb that matches the work; never reuse the same verb twice in one entry.
 3. Fill in title, organization, date, highlights
 4. Name it: PROJ_NAME = ProjectEntry(...)
 5. Add to profile/master_data.py: import + __all__
-6. python scripts/update_profile.py
+6. uv run scripts/validate_profile.py
 7. Append to profile/CHANGELOG.md
 ```
 
@@ -237,7 +294,7 @@ Pick a verb that matches the work; never reuse the same verb twice in one entry.
 ```
 1. Open the relevant profile file (experience.py or projects.py)
 2. Edit the string in the highlights list
-3. python scripts/update_profile.py --validate
+3. uv run scripts/validate_profile.py --validate
 4. Append to profile/CHANGELOG.md
 ```
 
@@ -247,13 +304,13 @@ Pick a verb that matches the work; never reuse the same verb twice in one entry.
 1. If not in any Enum: add to resume/cv_utils.py (relevant Enum class)
 2. Open profile/skills.py
 3. Add .add(EnumClass.value) to the builder chains in relevant presets
-4. python scripts/update_profile.py
+4. uv run scripts/validate_profile.py
 5. Append to profile/CHANGELOG.md
 ```
 
 **After any profile change, always run:**
 ```bash
-python scripts/update_profile.py
+uv run scripts/validate_profile.py
 ```
 
 ---
@@ -262,20 +319,20 @@ python scripts/update_profile.py
 
 ```bash
 # 1. Scaffold
-python scripts/new_application.py --id nvidia_ml_2026 --company NVIDIA --role "ML Engineer"
+uv run scripts/new_application.py --id nvidia_ml_2026 --company NVIDIA --role "ML Engineer"
 
-# 2. Edit (only 5 sections in resume/tailoring/nvidia_ml_2026.py):
+# 2. Edit (only 5 sections in resume/outputs/nvidia_ml_2026.py):
 #    ① JOB_ID, COMPANY, ROLE
 #    ② SectionConfig flags
 #    ③ EXPERIENCE list (select entries, use replace() for bullet overrides)
 #    ④ PROJECTS list
 #    ⑤ SUMMARY string
 
-# 3. Build
-python scripts/build.py --id nvidia_ml_2026 --pdf
+# 3. Build + finalize the upload bundle
+uv run scripts/build.py --id nvidia_ml_2026 --bundle
 
 # 4. Log after applying
-python scripts/track.py log --id nvidia_ml_2026 --platform "Company Website" --url https://...
+uv run scripts/track.py log --id nvidia_ml_2026 --platform "Company Website" --url https://...
 ```
 
 ---
@@ -283,11 +340,11 @@ python scripts/track.py log --id nvidia_ml_2026 --platform "Company Website" --u
 ## Workflow: Track Applications
 
 ```bash
-python scripts/track.py log    --id <id> --platform LinkedIn --url <url>
-python scripts/track.py update --id <id> --status "Phone Screen"
-python scripts/track.py list
-python scripts/track.py list   --status Applied
-python scripts/track.py show   --id <id>
+uv run scripts/track.py log    --id <id> --platform LinkedIn --url <url>
+uv run scripts/track.py update --id <id> --status "Phone Screen"
+uv run scripts/track.py list
+uv run scripts/track.py list   --status Applied
+uv run scripts/track.py show   --id <id>
 ```
 
 Status flow: `Saved → Applied → Recruiter Screen → Phone Screen → Technical Interview → Onsite → Offer → Accepted | Rejected | Withdrawn`
@@ -297,8 +354,8 @@ Status flow: `Saved → Applied → Recruiter Screen → Phone Screen → Techni
 ## File Naming Conventions
 
 - Application IDs: `{company}_{role}_{year}` lowercase with underscores — e.g. `nvidia_ml_eng_2026`
-- Tailoring files: `resume/tailoring/{id}.py`, `coverletter/tailoring/{id}.py`
-- Output .tex: `resume/outputs/{id}.tex`, `coverletter/outputs/{id}.tex`
+- Tailoring files: `resume/outputs/{id}.py`, `coverletter/outputs/{id}_cl.py`
+- Per-job docs: `resume/outputs/{id}.{py,tex,pdf}`, `coverletter/outputs/{id}_cl.{py,tex,pdf}` (under `private/` when overlay is present)
 - Profile variables: `COMPANY_ROLE_YEAR` for experience, `PROJ_{NAME}` for projects
 
 ---
@@ -314,14 +371,14 @@ Status flow: `Saved → Applied → Recruiter Screen → Phone Screen → Techni
 | Add / remove a job platform             | `active_platforms` in `config/job_search_config.yaml` |
 | Add platform-specific steps             | `config/platforms.yaml`                              |
 | Update networking message templates     | `networking/message_templates.md`                    |
-| Add a new application status            | `STATUS_VALUES` in `scripts/track.py` + `applications/schema.md` |
+| Add a new application status            | `STATUS_VALUES` in `scripts/track.py`                |
 
 ---
 
 ## Suggestions When You Want to Modify Something
 
 **"I want to A/B test two resume versions for the same job"**
-→ Create `resume/tailoring/{id}_v1.py` and `{id}_v2.py`. Log which was submitted with `--notes "Submitted v2"` in track.py.
+→ Create `resume/outputs/{id}_v1.py` and `{id}_v2.py`. Log which was submitted with `--notes "Submitted v2"` in track.py.
 
 **"I want a different summary for each role type"**
 → Add a new key to `profile/summaries.py` → `SUMMARIES` dict, then reference it in the tailoring file.
@@ -330,24 +387,26 @@ Status flow: `Saved → Applied → Recruiter Screen → Phone Screen → Techni
 → Add `show_publications: bool` to `SectionConfig` in `cv_utils.py`. Add the `\newboolean` + `\ifthenelse` block to `LATEX_BODY` in `cv2latex.py`. Add a `publications` field to `CV`. Add entries in `profile/research.py` or a new `profile/publications.py`.
 
 **"I want to keep a master resume that shows everything"**
-→ Create `resume/tailoring/master_all.py` that includes all experience and projects with `SKILLS_FULL`. Use it to review your full profile.
+→ Create `resume/outputs/master_all.py` that includes all experience and projects with `SKILLS_FULL`. Use it to review your full profile.
 
 **"I want to see which applications need follow-up"**
-→ `python scripts/track.py list --status Applied` shows everything still in Applied state. Cross-reference `date_applied` for ones older than 2 weeks.
+→ `uv run scripts/track.py list --status Applied` shows everything still in Applied state. Cross-reference `date_applied` for ones older than 2 weeks. Or run `uv run scripts/followup.py --list-only` to surface apps past the configured threshold automatically.
 
 **"I want to add a referral to an existing application"**
-→ `python scripts/track.py update --id <id> --notes "Referred by Jane Doe (jane@co.com)"`.
+→ `uv run scripts/track.py update --id <id> --notes "Referred by Jane Doe (jane@co.com)"`.
 
 ---
 
 ## Important Rules
 
 - Never commit API keys. Use `.env` for secrets.
-- `resume/outputs/` and `coverletter/outputs/` are gitignored — rebuild from tailoring files.
+- `.tex` / `.pdf` under `resume/outputs/` and `coverletter/outputs/` are gitignored —
+  rebuild from the `.py` sources (`{id}.py` / `{id}_cl.py`).
 - `profile/CHANGELOG.md` must be updated after every profile edit.
-- Run `python scripts/update_profile.py` after any profile change to catch broken imports early.
-- LaTeX special characters in bullet text must be escaped: `%→\\%`, `&→\\&`, `$→\\$`, `_→\\_`.
-- `skills/` should stay in sync with https://github.com/GregOratOr/skills — use git submodule.
+- Run `uv run scripts/validate_profile.py` after any profile change to catch broken imports early.
+- LaTeX special characters in bullet text must be escaped: `%→\%`, `&→\&`, `$→\$`, `_→\_`.
+- `skills/` is project-owned and versioned with this repo. Mirroring it to a personal skills
+  repo (e.g. https://github.com/GregOratOr/skills) is optional — see `skills/README.md`.
 
 ---
 
@@ -357,7 +416,8 @@ The fastest path from JD → ready-to-send application.
 
 ### Given a URL
 ```bash
-uv run scripts/ai_tailor.py --url "https://careers.nvidia.com/..." --id nvidia_ml_2026
+# --url requires the project-web opt-in (and WEB_BACKEND in .env)
+uv run scripts/ai_tailor.py --url "https://careers.nvidia.com/..." --id nvidia_ml_2026 --use-project-web
 ```
 
 ### Given pasted JD text
@@ -372,62 +432,88 @@ uv run scripts/ai_tailor.py --jd /tmp/jd.txt --id nvidia_ml_2026
 3. Rewrites bullet points to hit the JD's keywords (LaTeX-safe output)
 4. Generates 3 cover letter paragraphs specific to this company and role
 5. Generates 4 ready-to-send outreach messages (connection request, follow-up, cold email, referral ask)
-6. Writes all files: `resume/tailoring/{id}.py`, `coverletter/tailoring/{id}.py`, `applications/jobs/{id}/outreach.md`
+6. Writes all files: `resume/outputs/{id}.py`, `coverletter/outputs/{id}_cl.py`,
+   `applications/jobs/{id}/job_info.py`, `applications/jobs/{id}/networking.md`,
+   `applications/jobs/{id}/jd.txt`
+
+> **Note:** `ai_tailor.py` reads the education entries dynamically from `profile.education`,
+> so the generated tailoring file always matches your profile's actual variable names.
 
 ### After the script runs
 1. **Review** the generated tailoring file — confirm entry selection and bullet rewrites look right
 2. **Tweak** any bullet points in the tailoring file using `replace()` if needed
-3. **Build**: `uv run scripts/build.py --id {id} --pdf`
+3. **Build**: `uv run scripts/build.py --id {id} --bundle`
 4. **Apply** using the PDF, then log: `uv run scripts/track.py log --id {id} --platform X --url Y`
-5. **Outreach**: open `applications/jobs/{id}/outreach.md` — all messages are copy-paste ready
+5. **Outreach**: open `applications/jobs/{id}/networking.md` — all messages are copy-paste ready
 
 ### Agent instructions for JD tailoring
 When the user provides a JD (as text or URL), the agent should:
 1. Save the JD text to `/tmp/jd_<company>.txt` if it's a paste
 2. Run `uv run scripts/ai_tailor.py --jd /tmp/jd_<company>.txt --id <id>`
-   OR `uv run scripts/ai_tailor.py --url <url> --id <id>`
-3. Read the generated `resume/tailoring/{id}.py` and verify:
+   OR `uv run scripts/ai_tailor.py --url <url> --id <id> --use-project-web`
+3. Read the generated `resume/outputs/{id}.py` and verify:
    - The selected entries make sense for the role
    - Bullet points read naturally and hit the JD keywords
    - The summary names the company explicitly
+   - The `education` list matches the profile's actual education variable names
 4. If anything looks off, edit the tailoring file directly (the agent knows how to use `replace()`)
 5. Run `uv run scripts/build.py --id {id}` to confirm the .tex compiles
-6. Show the user the path to `applications/jobs/{id}/outreach.md` for copy-paste messages
+6. Show the user the path to `applications/jobs/{id}/networking.md` for copy-paste messages
 
 ---
 
 ## Workflow: Automated Job Discovery
 
-Find jobs, tailor everything, generate all outreach — in one command.
+**Agent path (preferred):** follow `skills/discover-jobs/SKILL.md` — shortlist in chat,
+append to `applications/shortlists.md`, hand accepted jobs to `new-application`.
+Use harness-native web; do not call `scripts/web.py` when the harness already has search.
+
+**Scripted batch** (no harness / explicit pipeline request):
 
 ```bash
-# Discover up to 5 jobs matching your profile (uses config/job_search_config.yaml)
-uv run scripts/job_discovery.py
+# Discover + tailor (uses config/job_search_config.yaml)
+uv run scripts/pipeline.py --level tailor --use-project-web
 
 # Limit count
-uv run scripts/job_discovery.py --max 10
+uv run scripts/pipeline.py --level tailor --max 10 --use-project-web
 
 # Custom search query
-uv run scripts/job_discovery.py --query "LLM inference optimization remote 2026"
+uv run scripts/pipeline.py --level tailor --query "LLM inference optimization remote 2026" --use-project-web
 
-# Preview only — see what would be found without writing files
-uv run scripts/job_discovery.py --max 10 --dry-run
+# Preview only — shortlist to terminal, no application files
+uv run scripts/pipeline.py --max 10 --dry-run --use-project-web
 
 # Discover + tailor + build PDFs in one shot
-uv run scripts/job_discovery.py --max 5 --build
+uv run scripts/pipeline.py --max 5 --build --use-project-web
+
+# Discover + tailor + build + append networking contacts for each job
+uv run scripts/pipeline.py --max 5 --build --find-contacts --use-project-web
+
+# WEB_BACKEND must be set explicitly in .env (searxng|tavily|brave|serper|harness)
 ```
 
-### What the script does automatically for each discovered job
-1. Searches the web (Claude + web_search tool) for open positions
+> **Harness-native web:** When you are an agent inside a harness that already has web
+> search/extraction (Cursor, Hermes, etc.), use those tools directly for discovery,
+> research, and contact-finding. Do **not** invoke `scripts/web.py` unless the harness lacks
+> web access. For scripted runs, pass `--use-project-web` and set `WEB_BACKEND`.
+
+> **Note:** Discovery helpers live in `scripts/job_discovery.py` (library only). Use
+> `pipeline.py` for scripted runs. `--search-mode` is retired.
+> Platform navigation notes live in `config/platforms.yaml` (agent playbook — not loaded by Python).
+
+### What the scripted pipeline does for each discovered job
+1. Searches via `scripts/web.py` (`WEB_BACKEND`) when `--use-project-web` is set — queries
+   incorporate `search_terms.must_include_one_of` from config; LLM ranks with campaign prefs
 2. Fetches the actual job posting from each URL
 3. Runs the full `ai_tailor.py` pipeline (parse → match → cover letter → outreach)
-4. Updates `applications/jobs/{id}/outreach.md` with ready-to-send messages
+4. Writes ready-to-send messages to `applications/jobs/{id}/networking.md`
 5. Saves a copy of the raw JD as `applications/jobs/{id}/jd.txt`
+6. Logs each successfully tailored job as `Saved` in `tracker.csv`
 
-### After discovery
+### After scripted discovery
 - Review `uv run scripts/track.py list` to see all new applications in "Saved" state
-- For each job: open `applications/jobs/{id}/outreach.md` for the copy-paste outreach messages
-- Find the contact on LinkedIn using the search queries in `outreach.md`
+- For each job: open `applications/jobs/{id}/networking.md` for the copy-paste outreach messages
+- Find the contact on LinkedIn using the search queries in `networking.md`
 - Send the connection request (already written, just paste it)
 - After they accept (3–7 days): send the follow-up message
 
@@ -437,15 +523,17 @@ Edit `config/job_search_config.yaml` to control:
 - `target_companies.tier_1/tier_2` — preferred companies
 - `search_terms.must_include_one_of` — required technical keywords
 - `profile.preferred_locations` — location filter
+- `networking.alumni_networks` — alumni labels for outreach / contact queries
 
+Also see `config/platforms.yaml` for board-specific search filters (agent-driven discovery).
 ---
 
-## Outreach Files
+## Networking Files
 
-Every application gets `applications/jobs/{id}/outreach.md` containing:
+Every application gets `applications/jobs/{id}/networking.md` containing:
 
 | Section | Content |
-|---------|---------|
+|---------|---------| 
 | LinkedIn Search Queries | 3 ready-to-paste search strings to find contacts |
 | ① Connection Request | ≤300 chars, paste directly into LinkedIn |
 | ② Follow-up Message | Send 3–7 days after connecting |

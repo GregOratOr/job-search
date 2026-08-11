@@ -33,8 +33,7 @@ EXAMPLE_UNIV_MS = EducationEntry(
     degree      = "\\textit{Master of Science in Artificial Intelligence}",
     gpa         = "3.8/4.0",
     details     = [
-        "\\textbf{Coursework:} Deep Learning, Computer Vision, Reinforcement Learning, "
-        "Natural Language Processing, Machine Learning, Algorithms"
+        "\\textbf{Coursework:} Course 1, Course 2, Course 3"
     ]
 )
 
@@ -45,7 +44,6 @@ EXAMPLE_UNIV_BTECH = EducationEntry(
     degree      = "\\textit{Bachelor of Technology in Computer Engineering}",
     gpa         = "8.5/10.0",
     details     = [
-        "\\textbf{Coursework:} Data Structures, Algorithms, Data Science, "
-        "Database Management Systems, Algorithms \\& Complexity"
+        "\\textbf{Coursework:} Course 1, Course 2, Course 3"
     ]
 )

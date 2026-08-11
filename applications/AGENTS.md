@@ -6,31 +6,45 @@
 applications/
 ├── tracker.csv          # Master application log — updated by scripts/track.py
 ├── schema.md            # Column definitions and valid values
+├── shortlists.md        # Discovery shortlist sessions (agent discover-jobs; create if absent)
 └── jobs/
     ├── _template/       # Template job bundle (auto-copied by new_application.py)
     │   └── job_info.py
     └── {id}/
-        └── job_info.py  # Per-job metadata, keywords, networking targets
+        ├── job_info.py
+        ├── jd.txt
+        ├── networking.md
+        ├── {id}_resume.{py,tex,pdf}         # after bundle
+        └── {id}_cover_letter.{py,tex,pdf}   # after bundle
 ```
+
+Paths are overlay-aware (`private/applications/` when the private submodule is present).
+
+## Shortlists
+
+Agent [discover-jobs](../skills/discover-jobs/SKILL.md) appends ranked posting sessions to
+`shortlists.md` (blocks separated by `---`). Scripted `pipeline.py --dry-run` prints a
+shortlist to the terminal and does **not** write this file. See
+[okf/glossary/shortlist.md](../okf/glossary/shortlist.md).
 
 ## Common Commands
 
 ```bash
 # Log a new application
-python scripts/track.py log --id google_swe_2026 --platform LinkedIn --url https://...
+uv run scripts/track.py log --id google_swe_2026 --platform LinkedIn --url https://...
 
 # Update status after a phone screen
-python scripts/track.py update --id google_swe_2026 --status "Phone Screen" \
+uv run scripts/track.py update --id google_swe_2026 --status "Phone Screen" \
     --notes "Scheduled Jan 15 10am PST with recruiter Jane Doe"
 
 # View all applications
-python scripts/track.py list
+uv run scripts/track.py list
 
 # View applications in a specific stage
-python scripts/track.py list --status "Technical Interview"
+uv run scripts/track.py list --status "Technical Interview"
 
 # Inspect one application
-python scripts/track.py show --id google_swe_2026
+uv run scripts/track.py show --id google_swe_2026
 ```
 
 ## Status Progression
@@ -50,7 +64,8 @@ Each `applications/jobs/{id}/job_info.py` stores:
 
 The `scripts/track.py log` command automatically reads `COMPANY`, `ROLE`,
 `PLATFORM`, and `URL` from `job_info.py` if the file exists, so you don't
-have to pass them as CLI flags.
+have to pass them as CLI flags. Tracker status is the source of truth —
+`STATUS` in `job_info.py` is advisory only (templates use `Saved`).
 
 ## Tracker CSV Tips
 

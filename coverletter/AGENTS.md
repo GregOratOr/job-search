@@ -7,10 +7,11 @@ coverletter/
 ├── cl_utils.py          # Dataclasses (CLHeader, RecipientInfo, JobInfo, etc.)
 ├── cl2latex.py          # Jinja2 → LaTeX engine
 ├── tailoring/
-│   ├── _template.py     # Master template — copy to create a new version
-│   └── {id}.py          # One file per job application
+│   └── _template.py     # Scaffold template — copied into outputs/{id}_cl.py
 └── outputs/
-    └── {id}.tex         # Generated LaTeX files (gitignored)
+    ├── {id}_cl.py       # Per-job source
+    ├── {id}_cl.tex      # Generated LaTeX (gitignored)
+    └── {id}_cl.pdf      # Compiled PDF (gitignored)
 ```
 
 ## Key Object: CoverLetter
@@ -26,7 +27,8 @@ CoverLetter(
         paragraphs = ["Para 1...", "Para 2...", "Para 3..."],
         closing    = "Sincerely,",
     ),
-    output_file = f"coverletter/outputs/{JOB_ID}.tex",
+    # Overlay-aware path, e.g. private/coverletter/outputs/{JOB_ID}_cl.tex
+    output_file = OUTPUT_FILE,
 )
 ```
 
@@ -44,17 +46,18 @@ CoverLetter(
 ## Build Command
 
 ```bash
-python scripts/build.py --id <id> --only coverletter
+uv run scripts/build.py --id <id> --only coverletter
 ```
 
 ## Signature Image
 
 Set `signature_image_path` in `cl_utils.py → CL_HEADER`.
-Path is relative to the output `.tex` file location (`coverletter/outputs/`).
+Path is relative to the output `.tex` file location (`coverletter/outputs/`,
+or `private/coverletter/outputs/` with overlay).
 If no signature: set to `None` and the `\\includegraphics` line is skipped.
 
 ## Adding a New Field
 
 1. Add field to the appropriate dataclass in `cl_utils.py`
 2. Add the Jinja2 template tag in `LATEX_BODY` in `cl2latex.py`
-3. Populate the field in tailoring files
+3. Populate the field in per-job source files
