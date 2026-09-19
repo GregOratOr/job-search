@@ -16,6 +16,10 @@ import argparse
 import importlib.util
 from pathlib import Path
 from jinja2 import Environment, BaseLoader
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from coverletter.cl_utils import CoverLetter
 
 # ==========================================
 # LATEX PREAMBLE
@@ -213,7 +217,7 @@ def generate_for_id(job_id: str, output_file: str = "") -> Path:
 
 
 def generate_tex_file(data_file: str, output_file: str = "") -> Path:
-    """Generate a .tex cover letter from a tailoring module.
+    """Generate a .tex cover letter from a tailoring module (.py file).
 
     Args:
         data_file:   Path to a tailoring .py file containing cl_data.
@@ -235,6 +239,23 @@ def generate_tex_file(data_file: str, output_file: str = "") -> Path:
     output_file_path.parent.mkdir(parents=True, exist_ok=True)
 
     print(">>> Rendering cover letter template...")
+    try:
+        rendered_latex = _TEMPLATE.render(cl=cl)
+    except Exception as e:
+        print(f"[x] Rendering error: {e}")
+        sys.exit(1)
+
+    output_file_path.write_text(rendered_latex, encoding="utf-8")
+    print(f"[+] Success! -> {output_file_path.resolve()}")
+    return output_file_path
+
+
+def generate_tex_from_cl(cl: 'CoverLetter', output_file: str) -> Path:
+    """Generate a .tex file directly from a CoverLetter dataclass (loader path)."""
+    output_file_path = Path(output_file)
+    output_file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    print(">>> Rendering cover letter template from CoverLetter dataclass...")
     try:
         rendered_latex = _TEMPLATE.render(cl=cl)
     except Exception as e:

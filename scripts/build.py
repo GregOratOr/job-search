@@ -4,21 +4,15 @@ scripts/build.py
 ----------------
 Build the resume and/or cover letter .tex files for a given application ID.
 
-Per-job sources live under ``{resume,coverletter}/outputs/``
-(``{id}.py`` for resume, ``{id}_cl.py`` for cover letter). Paths are
-routed through ``scripts.data_paths`` (``private/`` when the overlay is active).
-
-Path mode (shared with cv2latex / cl2latex / bundle):
-    (default)   auto-detect private/profile/
-    --private   force private/ paths
-    --public    force public repo-root paths
+New flow: loads YAML via loader.py -> CV/CoverLetter dataclasses -> renderer.
+Per-job sources live under applications/jobs/<id>/ (resume.yaml, cover_letter.yaml).
 
 Usage:
     uv run scripts/build.py --id google_swe_2026
-    uv run scripts/build.py --id google_swe_2026 --private --pdf
+    uv run scripts/build.py --id google_swe_2026 --pdf
     uv run scripts/build.py --id google_swe_2026 --only resume
     uv run scripts/build.py --id google_swe_2026 --only coverletter
-    uv run scripts/build.py --id google_swe_2026 --bundle
+    uv run scripts/build.py --id google_swe_2026 --keep-temp
 """
 
 import argparse
@@ -31,42 +25,29 @@ sys.path.insert(0, str(ROOT))
 from scripts.data_paths import (
     add_overlay_cli_flags,
     bootstrap_paths,
-    document_py,
-    document_tex,
+    data_path,
     rel_to_root,
-    resolve_document_paths,
 )
 
 
 def build_resume(job_id: str) -> Path:
-    try:
-        src, tex_out = resolve_document_paths("resume", job_id)
-    except FileNotFoundError:
-        expected = document_py("resume", job_id)
-        print(f"[x] Resume source file not found: {expected}")
-        print(f"    Run: uv run scripts/new_application.py --id {job_id}")
-        sys.exit(1)
-    if src.parent.name == "tailoring":
-        print(f"[!] Using legacy path {rel_to_root(src)}; "
-              f"move to {rel_to_root(document_py('resume', job_id))} when convenient.")
+    from scripts.loader import load_resume
     import resume.cv2latex as engine
+
+    cv = load_resume(job_id)
+    tex_out = data_path("applications", "jobs", job_id, "resume.tex")
     tex_out.parent.mkdir(parents=True, exist_ok=True)
-    return engine.generate_tex_file(str(src), str(tex_out))
+    return engine.generate_tex_from_cv(cv, str(tex_out))
 
 
 def build_coverletter(job_id: str) -> Path | None:
-    try:
-        src, tex_out = resolve_document_paths("coverletter", job_id)
-    except FileNotFoundError:
-        expected = document_py("coverletter", job_id)
-        print(f"[!] Cover letter source file not found: {expected}")
-        print(f"    Skipping cover letter build.")
-        return None
-    if src.parent.name == "tailoring":
-        print(f"[!] Using legacy path {rel_to_root(src)}")
+    from scripts.loader import load_cover_letter
     import coverletter.cl2latex as engine
+
+    cl = load_cover_letter(job_id)
+    tex_out = data_path("applications", "jobs", job_id, "cover_letter.tex")
     tex_out.parent.mkdir(parents=True, exist_ok=True)
-    return engine.generate_tex_file(str(src), str(tex_out))
+    return engine.generate_tex_from_cl(cl, str(tex_out))
 
 
 def compile_pdf(tex_path: Path) -> None:
@@ -85,16 +66,34 @@ def compile_pdf(tex_path: Path) -> None:
         except FileNotFoundError:
             print("[x] pdflatex not found on PATH — a LaTeX distribution is required for PDF output.")
             print("    Install TeX Live (https://tug.org/texlive/) or MiKTeX (https://miktex.org/),")
-            print("    then re-run. Alternatively, drop --pdf/--bundle to generate only the .tex file.")
+            print("    then re-run. Alternatively, drop --pdf to generate only the .tex file.")
             sys.exit(1)
         if result.returncode != 0:
             print(f"[x] pdflatex failed (pass {i+1}):")
+            # Show more context around errors
             for line in result.stdout.split("\n"):
-                if line.startswith("!") or "Error" in line:
+                if line.startswith("!") or "Error" in line or "Undefined control sequence" in line:
                     print(f"    {line}")
+            # Also show the last 20 lines for context
+            print("    --- Last 20 lines of output ---")
+            for line in result.stdout.split("\n")[-20:]:
+                print(f"    {line}")
             sys.exit(1)
     pdf_path = tex_path.with_suffix(".pdf")
     print(f"[+] PDF generated: {pdf_path.resolve()}")
+
+
+def clean_temp_files(tex_path: Path, keep: bool = False) -> None:
+    """Delete LaTeX auxiliary files unless keep=True."""
+    if keep:
+        print(f"[!] Keeping LaTeX temp files in {tex_path.parent}")
+        return
+    for ext in (".aux", ".log", ".out", ".toc", ".fls", ".fdb_latexmk", ".synctex.gz"):
+        for f in tex_path.parent.glob(f"*{ext}"):
+            try:
+                f.unlink()
+            except OSError:
+                pass
 
 
 def main():
@@ -104,9 +103,8 @@ def main():
                         help="Build only resume or only coverletter (default: both)")
     parser.add_argument("--pdf", action="store_true",
                         help="Also compile .tex -> PDF using pdflatex")
-    parser.add_argument("--bundle", action="store_true",
-                        help="After compiling, move .py/.tex/.pdf into applications/jobs/<id>/ "
-                             "and clean LaTeX temp files (implies --pdf)")
+    parser.add_argument("--keep-temp", action="store_true",
+                        help="Keep LaTeX auxiliary files (.aux, .log, etc.) after PDF compile")
     add_overlay_cli_flags(parser)
     args = parser.parse_args()
 
@@ -114,39 +112,45 @@ def main():
     print(f">>> Path mode: {'private' if active else 'public'}"
           f"{' (forced)' if args.overlay is not None else ' (auto)'}")
 
-    if args.bundle:
-        args.pdf = True
-
     resume_path = None
     cl_path = None
 
     if args.only != "coverletter":
-        resume_path = build_resume(args.id)
+        try:
+            resume_path = build_resume(args.id)
+        except Exception as e:
+            print(f"[x] Resume build failed: {e}")
+            sys.exit(1)
 
     if args.only != "resume":
-        cl_path = build_coverletter(args.id)
+        try:
+            cl_path = build_coverletter(args.id)
+        except FileNotFoundError:
+            print(f"[!] cover_letter.yaml not found for {args.id}; skipping cover letter.")
+        except Exception as e:
+            print(f"[x] Cover letter build failed: {e}")
+            sys.exit(1)
 
     if args.pdf:
         if resume_path:
             compile_pdf(resume_path)
+            clean_temp_files(resume_path, keep=args.keep_temp)
         if cl_path:
             compile_pdf(cl_path)
-
-    if args.bundle:
-        from scripts.bundle import finalize_bundle
-        finalize_bundle(args.id)
-        print("\n* Build + bundle complete.")
-        return
+            clean_temp_files(cl_path, keep=args.keep_temp)
 
     print("\n* Build complete.")
     if resume_path:
         print(f"  Resume  -> {resume_path}")
     if cl_path:
         print(f"  CL      -> {cl_path}")
-    out_dir = resume_path.parent if resume_path else document_tex("resume", args.id).parent
-    print("\nNext step: compile with pdflatex (run twice for bookmarks)")
-    print(f"  cd {out_dir}")
-    print(f"  pdflatex {args.id}.tex && pdflatex {args.id}.tex")
+
+    if not args.pdf:
+        out_dir = resume_path.parent if resume_path else data_path("applications", "jobs", args.id)
+        print("\nNext step: compile with pdflatex (run twice for bookmarks)")
+        print(f"  cd {out_dir}")
+        if resume_path:
+            print(f"  pdflatex {args.id}.tex && pdflatex {args.id}.tex")
 
 
 if __name__ == "__main__":
