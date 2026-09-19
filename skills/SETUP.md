@@ -29,8 +29,21 @@ hermes setup
 #   (one-shot alternative on recent Ollama builds: `ollama launch hermes`)
 
 # 4. Make these skills available to Hermes
-#    Copy (or symlink) this folder into Hermes' skills directory:
-#    Windows: xcopy /E /I skills %USERPROFILE%\.hermes\skills
+#    Copy (or symlink) this folder into the active profile's skills directory:
+#    Windows (default profile):
+#      xcopy /E /I skills %USERPROFILE%\.hermes\skills
+#    Dedicated job-search profile (recommended):
+#      hermes profile create job-search --clone
+#      xcopy /E /I skills %USERPROFILE%\.hermes\profiles\job-search\skills
+
+# 5. Install the job-search SOUL (identity for this Hermes profile)
+#    Canonical source: docs/hermes/SOUL.md  →  $HERMES_HOME/SOUL.md
+#    Hermes loads SOUL only from HERMES_HOME (not the repo cwd).
+#    Windows (default profile):
+#      copy docs\hermes\SOUL.md %USERPROFILE%\.hermes\SOUL.md
+#    job-search profile:
+#      copy docs\hermes\SOUL.md %USERPROFILE%\.hermes\profiles\job-search\SOUL.md
+#    Start a new Hermes session after copying so the identity reloads.
 ```
 
 Run Hermes **from the repo root** so it auto-loads `AGENTS.md` and the
@@ -39,7 +52,10 @@ subdirectory `AGENTS.md` files, then prompt naturally, e.g.
 
 Notes:
 - Pick a model with strong tool-calling; small models mangle multi-step file edits.
-- `config.yaml` lives at `~/.hermes/config.yaml` if you prefer editing it directly.
+- `config.yaml` lives at `~/.hermes/config.yaml` (or under `~/.hermes/profiles/<name>/`).
+- Keep `docs/hermes/SOUL.md` as the versioned source of truth; re-copy into
+  `$HERMES_HOME/SOUL.md` after SOUL edits. Do not put a competing `SOUL.md` in the
+  repo root — Hermes ignores cwd for SOUL, and AGENTS.md already carries project detail.
 
 ---
 
