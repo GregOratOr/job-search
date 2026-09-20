@@ -196,9 +196,10 @@ LATEX_BODY = r"""
     ((% if cv.header.leetcode_url %)) \ | \ \faCode\ \href{((= cv.header.leetcode_url =))}{LeetCode} ((% endif %))
     ((% if cv.header.website_url %))\ | \ \href{((= cv.header.website_url =))}{Portfolio} ((% endif %))
 
+    % ─── Position Applied ─────────────────────────────────────────────────────
     ((% if cv.config.show_position_applied %))
     \vspace{2pt}
-    \textbf{Position Applied: }{((= cv.position.role =))}
+    \ | \ \textbf{Position Applied: }{((= cv.position.role =))}
     ((% endif %))
 \end{header}
 

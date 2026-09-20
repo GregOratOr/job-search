@@ -576,9 +576,22 @@ def load_resume(job_id: str) -> CV:
             errors.append(f"resume.yaml ({job_id}): {e}")
     
     # Skills - convert to SkillCategory list
-    skills = []
-    for cat in resume_data.get('skills', []):
-        skills.append(SkillCategory(name=cat['name'], items=cat['items']))
+        skills = []
+        for cat in resume_data.get('skills', []):
+            # LaTeX-escape special chars in skill items for clean PDF compilation
+            # but keep readable names (C#, Weights & Biases) that match inventory
+            items = cat['items']
+            # Escape LaTeX specials: & % $ # _ { }
+            # Order matters: escape backslash first, then others
+            items = items.replace('\\', '\\textbackslash{}')
+            items = items.replace('&', '\\&')
+            items = items.replace('%', '\\%')
+            items = items.replace('$', '\\$')
+            items = items.replace('#', '\\#')
+            items = items.replace('_', '\\_')
+            items = items.replace('{', '\\{')
+            items = items.replace('}', '\\}')
+            skills.append(SkillCategory(name=cat['name'], items=items))
     
     # Summary
     summary = resume_data.get('summary')

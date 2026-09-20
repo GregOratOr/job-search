@@ -1,88 +1,80 @@
 ---
 name: tailor-resume
-description: Tailor a resume to a specific job description — select profile entries, rewrite bullets around the JD's keywords, and deliver a built, 1-page PDF. Use when the user provides a JD or posting URL and wants a tailored resume, or when an orchestrating skill dispatches the resume-tailoring step.
+description: Tailor a resume to a specific job description — select profile entries, rewrite bullets around the JD's keywords, and deliver a validated resume.yaml. Use when the user provides a JD or posting URL and wants a tailored resume, or when an orchestrating skill dispatches the resume-tailoring step.
 ---
 
 # Tailor Resume
 
-You (the agent) do the tailoring reasoning yourself: read the JD, judge which profile
-entries fit, rewrite the bullets. `ai_tailor.py` is the fallback for explicit script
-requests or runs with no harness. Mechanical tools (`build.py`,
-`validate_profile.py`) remain your normal instruments — they are deterministic; use
-them rather than hand-writing LaTeX or trusting doc examples.
+You (the agent) do the tailoring reasoning yourself: read the JD, judge which profile entries fit, rewrite the bullets. Zero LLM calls in Python. The only scripts involved are the loader's validation and the renderer.
 
-Deliverable: `resume/outputs/<id>.py` (overlay-aware) plus a built PDF that fits
-exactly 1 page. The cover letter is `tailor-coverletter`'s job; audit verdicts, the
-bundle, and tracking belong to the orchestrator (`new-application`).
+**Deliverable:** `applications/jobs/<id>/resume.yaml` — fully resolved, validated by `loader.py`, ready for `build.py`.
 
 ## ⛔ Profile is read-only
 
-Read `profile/` only. Every job-specific change — reworded bullets, injected
-keywords — goes into the tailoring file via `dataclasses.replace()`, never into the
-source entries.
+Read `profile/` only. Every job-specific change — reworded bullets, injected keywords — goes into `resume.yaml`, never into the source entries.
+
+## Date format rule (CRITICAL)
+
+All dates in `profile/` YAML files MUST use compact 3-letter months: `Jan`, `Feb`, `Mar`, `Apr`, `May`, `Jun`, `Jul`, `Aug`, `Sep`, `Oct`, `Nov`, `Dec`. Example: `Feb 2026 -- Mar 2026`, `Sep 2024 -- Dec 2025`. This ensures visual consistency across experience, projects, and education sections in the rendered PDF. Update `profile/experience.yaml`, `profile/projects.yaml`, `profile/education.yaml` to this format before tailoring.
+
+## LaTeX escaping in YAML
+
+In `resume.yaml` and `profile/` YAML files: use double backslash for literal backslash in LaTeX output.
+- `W\\&B` in YAML → `W\&B` in LaTeX → renders `W&B`
+- `b\\_min` → `b\_min`
+- `40\\%` → `40\%`
+The `loader.py` auto-escapes skill items; write them readable (`C#`, `Weights & Biases`).
+
+## Reference files (read these first)
+
+- `skills/tailor-resume/selection.md` — scoring rubric, budgets, section visibility, ordering
+- `skills/tailor-resume/tailoring-checks.md` — pre-build self-review (facts, keyword coverage, bullet length, one-page fit)
+- `skills/tailor-resume/RESUME_GUIDELINES.md` — style authority (XYZ, Harvard MCS, verb bank, per-section rules)
 
 ## Steps
 
-1. **Inventory.** Get the real entry variable names:
+1. **Inventory.** Get real entry variable names:
    `uv run scripts/validate_profile.py --inventory`
-2. **Read the JD** (`applications/jobs/<id>/jd.txt`): extract company, role, top
-   keywords, hard requirements.
-3. **Read `docs/resume-writing-reference.md`** — the standard every rewrite is graded
-   against (XYZ formula, action-verb bank, per-section rules).
-4. **Write `resume/outputs/<id>.py`**, editing only:
-   - `CONFIG` — which sections show
-   - `EXPERIENCE` — select entries; `replace(ENTRY, highlights=[...])` to reword
-     bullets around JD keywords
-   - `PROJECTS` — the 2–4 most relevant
-   - `SUMMARY` — a `SUMMARIES[...]` preset or custom 2–3 sentences naming the company
-   - skills preset (`SKILLS_FULL` / `SKILLS_ML_FOCUSED` / `SKILLS_SWE_FOCUSED` /
-     `SKILLS_RESEARCH_FOCUSED`)
-5. **Build:** `uv run scripts/build.py --id <id> --only resume --pdf`
-6. **Fit loop** — see below. Ends when the PDF is exactly 1 page with minimal wasted
-   space (≤ 1 empty line) and the iteration audit raises no new 🔴 items.
+2. **Read the JD** (`applications/jobs/<id>/jd.txt` + `job.yaml`): extract company, role, hard requirements, nice-to-haves, normalized keywords, company hooks.
+3. **Read reference files** above.
+4. **Selection** (Goal 2). Score every profile entry against the JD using the rubric in `selection.md`. Pick entries within budgets. Record a short `rationale` per entry in `resume.yaml`.
+5. **Authoring** (Goal 3). Write `resume.yaml` with:
+   - `position` (role)
+   - `sections` (visibility flags per `selection.md` rules)
+   - `summary` — custom per job, 3–4 sentences, grounded in profile facts; include company name at your discretion (may affect application quality in some cases)
+   - `skills` — subset from `profile/skills.yaml` inventory
+   - `experience` — selected entries with `source` id; bullets as `use_profile: idx` or `rewrite: "text"`; each bullet marked verbatim/rewritten
+   - `projects` — same structure
+   - `research` — same structure (if visible)
+   - `education` — selected entries (usually all)
+6. **Validate.** `uv run scripts/loader.py --resume <id>` — must pass on first attempt.
+7. **Tailoring checks.** Run through `tailoring-checks.md` before handing off to build. Key: keyword coverage is hybrid — cover as many hard requirements as possible, flag missing in audit, ask user per-case (see `tailoring-checks.md` Check 2).
+8. **Approval gate.** Present `resume.yaml` to user for review before build. Fix text there — cheap.
+9. **Build.** User runs `uv run scripts/build.py --id <id> --pdf` (or orchestrator does it).
 
-## Fit loop (max 3 iterations)
+## Fit loop (max 3 iterations) — carried from old skill
 
-The 3-iteration cap exists to stop a spiral down a wrong decision path — if the
-document doesn't fit after 3 rounds, stop and report the state to the caller/user
-instead of continuing to hack at it.
+If PDF > 1 page or checks fail, iterate (max 3):
+1. **Measure.** Check page count. Compare against previous iteration: what did the last edit cost/buy in lines/space? Use observed exchange rate to size this edit — precise cuts, not blind trimming.
+2. **Edit** `resume.yaml`. Over 1 page, in order until it fits:
+   - Drop least-relevant project (≤ 4 total)
+   - Cut weakest bullet per experience entry (≤ 5 each)
+   - Shorten wordy bullets (≤ 150 chars)
+   - Disable `show_coursework` / `show_research`
+   - Disable `show_summary` only if genuinely non-essential
+   - Last resort: drop a whole experience entry (keep 2 strongest)
+   Under-filled (> 2 empty lines): restore a bullet or project that earns its space.
+3. **Rebuild** + re-check.
+4. **Audit** via `audit-application` skill (scoped to resume) — iteration done only when page fits AND edit didn't gut quality (e.g., trimmed away JD's top keywords).
 
-Each iteration:
+## Re-tailoring
 
-1. **Measure.** Check the page count (`pdfinfo` or pypdf). Compare against the
-   previous iteration: what did the last edit cost or buy in lines/space? Use that
-   observed exchange rate to size this iteration's edit — precise cuts, not blind
-   trimming.
-2. **Edit** `resume/outputs/<id>.py`. Over 1 page, in order until it fits: drop the
-   least-relevant project (≤ 4 total) → cut the weakest bullet per experience entry
-   (≤ 5 each) → shorten wordy bullets (≤ 150 chars) → disable `show_coursework` /
-   `show_research` → disable `show_summary` only if genuinely non-essential → last
-   resort, drop a whole experience entry (keep the 2 strongest). Under-filled
-   (> 2 empty lines), expand: restore a bullet or project that earns its space.
-3. **Rebuild** (step 5) and re-check.
-4. **Audit** the resume via the `audit-application` skill, scoped to the resume —
-   the iteration is only done when the page fits *and* the edit didn't gut quality
-   (e.g. trimmed away the JD's top keywords).
-
-## Style rules (apply to every rewrite)
-
-Full rules in `docs/resume-writing-reference.md`; the non-negotiables:
-
-- **XYZ formula:** [action verb] + [what] + [tools/how] + [quantified result];
-  metric last, active voice, no pronouns. Quantify only what is true — every claim
-  must trace to a profile entry.
-- Bold key terms with `\textbf{...}`; keep bullets under ~200 chars.
-- Escape LaTeX specials: `%`→`\%`, `&`→`\&`, `$`→`\$`, `_`→`\_`, `#`→`\#`.
-- Select + `replace()` only — a tailoring file that *contains* profile data is wrong.
+When user says "redo this, emphasise X": edit the existing `resume.yaml` — prior manual fixes survive. Re-run selection only for the changed emphasis; preserve bullet rewrites where source unchanged.
 
 ## Script fallback
 
 Only on explicit user request or with no harness driving:
-
 ```bash
 uv run scripts/ai_tailor.py --jd jd.txt --id <id>    # or --url "<posting url>" --use-project-web
 ```
-
-Calling any AI script from a cloud-model session requires `--provider`/`--model` —
-see `okf/scripts/llm-provider.md` ("Calling AI scripts from a harness").
-Then review its generated files against steps 4–6 above.
+Then review generated files against steps 4–8 above.
